@@ -1,0 +1,17 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users: own profile read/write; any authenticated user can read others (for Send-to recipient list)
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write, create: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Transactions: users can read their own (as sender or receiver)
+    match /users/{userId}/transactions/{txId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create, update, delete: if false; // only Cloud Functions write
+    }
+  }
+}

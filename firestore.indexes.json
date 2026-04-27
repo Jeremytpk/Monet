@@ -1,0 +1,29 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "transactions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "receiver_id", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "transactions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "sender_id", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "transactions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

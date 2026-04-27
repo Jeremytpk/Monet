@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Env and secrets
+.env
+.env.local
+*.env
+!*.env.example
+
+# Firebase
+.firebaserc
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+*.log
+
+# Build / IDE
+dist/
+build/
+.expo/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+*.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# React Native / Expo
+mobile/.expo/
+mobile/ios/
+mobile/android/.gradle
+mobile/android/app/build
+mobile/android/build
+
+# Testing
+coverage/
+.nyc_output/

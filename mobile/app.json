@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Monet",
+    "slug": "monet",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "scheme": "monet",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0D0D0D"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.jerttech.monet"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0D0D0D"
+      },
+      "package": "com.jerttech.monet"
+    },
+    "plugins": ["expo-router", ["expo-image-picker", { "photosPermission": "Allow Monet to access your photos for your profile picture.", "cameraPermission": "Allow Monet to use your camera to take a profile photo." }]]
+  }
+}
