@@ -28,6 +28,14 @@ export default function SendScreen() {
   const { t } = useLanguage();
   const router = useRouter();
   const styles = createStyles(colors);
+  const [recipients, setRecipients] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedUid, setSelectedUid] = useState(null);
+  const [amount, setAmount] = useState('');
+  const [fundingSource, setFundingSource] = useState('wallet');
+  const [sending, setSending] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [mostSentUids, setMostSentUids] = useState([]);
 
   if (!user) {
     return (
@@ -55,14 +63,6 @@ export default function SendScreen() {
       </ScrollView>
     );
   }
-  const [recipients, setRecipients] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedUid, setSelectedUid] = useState(null);
-  const [amount, setAmount] = useState('');
-  const [fundingSource, setFundingSource] = useState('wallet');
-  const [sending, setSending] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [mostSentUids, setMostSentUids] = useState([]);
   const balance = profile?.wallet_balance ?? 0;
 
   const fundingSources = [
