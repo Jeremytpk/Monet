@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 import { useAuth } from '../../../lib/useAuth';
@@ -10,9 +12,14 @@ export default function ActivityScreen() {
   const { user } = useAuth();
   const { colors } = useTheme();
   const { t } = useLanguage();
+  const router = useRouter();
   const styles = createStyles(colors);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  if (!user) {
+    return <GuestPrompt colors={colors} t={t} router={router} />;
+  }
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -85,6 +92,31 @@ export default function ActivityScreen() {
   );
 }
 
+function GuestPrompt({ colors, t, router }) {
+  const styles = createStyles(colors);
+  return (
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.guestContent}
+      showsVerticalScrollIndicator={false}
+    >
+      <Text style={styles.title}>{t.tabActivity}</Text>
+      <View style={styles.guestCard}>
+        <Ionicons name="lock-closed-outline" size={48} color={colors.muted} style={styles.guestIcon} />
+        <Text style={styles.guestTitle}>{t.signInToAccessSettings}</Text>
+        <Text style={styles.guestMessage}>{t.signInMessage}</Text>
+        <TouchableOpacity
+          style={styles.guestButton}
+          onPress={() => router.push('/(app)/login')}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.guestButtonText}>{t.logIn}</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  );
+}
+
 function createStyles(colors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
@@ -113,5 +145,45 @@ function createStyles(colors) {
     rowAmount: { fontSize: 17, fontWeight: '700' },
     amountIn: { color: '#22C55E' },
     amountOut: { color: colors.text },
+    guestContent: {
+      flexGrow: 1,
+      padding: 24,
+      paddingTop: 56,
+    },
+    guestCard: {
+      backgroundColor: colors.card,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 32,
+      alignItems: 'center',
+      marginTop: 24,
+    },
+    guestIcon: { marginBottom: 16 },
+    guestTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: colors.text,
+      marginBottom: 10,
+      textAlign: 'center',
+    },
+    guestMessage: {
+      fontSize: 15,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      lineHeight: 22,
+      marginBottom: 24,
+    },
+    guestButton: {
+      backgroundColor: colors.accent,
+      paddingVertical: 14,
+      paddingHorizontal: 28,
+      borderRadius: 14,
+    },
+    guestButtonText: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: colors.accentText,
+    },
   });
 }
