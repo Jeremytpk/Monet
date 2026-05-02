@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, orderBy, where } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 import { useAuth } from '../../../lib/useAuth';
 import { useTheme } from '../../../lib/ThemeContext';
@@ -39,29 +39,50 @@ export default function WalletScreen() {
   const bannerRef = useRef(null);
   const [bannerIndex, setBannerIndex] = useState(0);
 
-  const banners = [
+  const [banners, setBanners] = useState([
     { id: '1', imageUri: BANNER_IMAGES[0], title: t.banner1Title, subtitle: t.banner1Subtitle },
     { id: '2', imageUri: BANNER_IMAGES[1], title: t.banner2Title, subtitle: t.banner2Subtitle },
     { id: '3', imageUri: BANNER_IMAGES[2], title: t.banner3Title, subtitle: t.banner3Subtitle },
-  ];
+  ]);
 
   useEffect(() => {
     if (!user?.uid) return;
     const unsub = onSnapshot(doc(db, 'users', user.uid), (snap) => {
       if (snap.exists()) setProfile(snap.data());
-    });
+    }, (err) => { console.warn('wallet profile onSnapshot error', err); });
     return () => unsub();
   }, [user?.uid]);
 
   useEffect(() => {
-    const t = setInterval(() => {
+    if (!banners || banners.length === 0) return;
+    const timer = setInterval(() => {
       setBannerIndex((i) => {
-        const next = (i + 1) % BANNER_IMAGES.length;
+        const next = (i + 1) % banners.length;
         bannerRef.current?.scrollTo({ x: next * BANNER_PAGE_WIDTH, animated: true });
         return next;
       });
     }, AUTO_SWIPE_INTERVAL);
-    return () => clearInterval(t);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Subscribe to ads from Firestore. To avoid requiring a composite index (where + orderBy),
+  // we order by created_at server-side and filter the `active` flag client-side.
+  useEffect(() => {
+    const q = query(collection(db, 'ads'), orderBy('created_at', 'desc'));
+    const unsub = onSnapshot(q, (snap) => {
+      if (!snap.empty) {
+        // map docs then client-side filter active ones
+        const items = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((it) => it.active === true);
+        setBanners(items.map((it, idx) => ({
+          id: it.id || String(idx),
+          imageUri: it.image_url || BANNER_IMAGES[idx % BANNER_IMAGES.length],
+          title: it.title || '',
+          subtitle: it.message || '',
+        })));
+        setBannerIndex(0);
+      }
+    }, (err) => { console.warn('ads banner onSnapshot error', err); });
+    return () => unsub();
   }, []);
 
   function handleProfilePress() {
@@ -140,45 +161,62 @@ export default function WalletScreen() {
         </View>
       </View>
 
-      <View style={styles.balanceSection}>
-        <Text style={styles.greeting}>{t.yourBalance}</Text>
-        <Text style={styles.balance}>
-          $ {balance.toFixed(2)}
-        </Text>
-      </View>
-
-      <TouchableOpacity
-        style={styles.addMoneyButton}
-        onPress={() => router.push('/(app)/add-money')}
-        activeOpacity={0.85}
-      >
-        <Ionicons name="add-circle-outline" size={22} color={colors.accent} style={styles.primaryButtonIcon} />
-        <View>
-          <Text style={styles.addMoneyButtonText}>{t.addMoney}</Text>
-          <Text style={styles.addMoneyButtonSubtext}>{t.addMoneySubtext}</Text>
+      {!user ? (
+        <View style={styles.guestCard}>
+          <Ionicons name="lock-closed-outline" size={48} color={colors.muted} style={styles.guestIcon} />
+          <Text style={styles.guestTitle}>{t.tabWallet}</Text>
+          <Text style={styles.guestMessage}>{t.signInMessage}</Text>
+          <TouchableOpacity
+            style={styles.guestButton}
+            onPress={() => router.push('/(app)/login')}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.guestButtonText}>{t.logIn}</Text>
+          </TouchableOpacity>
         </View>
-      </TouchableOpacity>
+      ) : (
+        <>
+          <View style={styles.balanceSection}>
+            <Text style={styles.greeting}>{t.yourBalance}</Text>
+            <Text style={styles.balance}>
+              $ {balance.toFixed(2)}
+            </Text>
+          </View>
 
-      <TouchableOpacity
-        style={styles.primaryButton}
-        onPress={() => router.push('/(app)/withdraw')}
-        activeOpacity={0.85}
-      >
-        <Ionicons name="phone-portrait-outline" size={22} color={colors.accentText} style={styles.primaryButtonIcon} />
-        <View>
-          <Text style={styles.primaryButtonText}>{t.transferMobile}</Text>
-          <Text style={styles.primaryButtonSubtext}>{t.transferMobileSubtext}</Text>
-        </View>
-      </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.addMoneyButton}
+            onPress={() => router.push('/(app)/add-money')}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="add-circle-outline" size={22} color={colors.accent} style={styles.primaryButtonIcon} />
+            <View>
+              <Text style={styles.addMoneyButtonText}>{t.addMoney}</Text>
+              <Text style={styles.addMoneyButtonSubtext}>{t.addMoneySubtext}</Text>
+            </View>
+          </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.secondaryButton}
-        onPress={() => router.push('/(app)/(tabs)/activity')}
-        activeOpacity={0.85}
-      >
-        <Ionicons name="time-outline" size={22} color={colors.accent} />
-        <Text style={styles.secondaryButtonText}>{t.recentActivity}</Text>
-      </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={() => router.push('/(app)/mobile-money')}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="phone-portrait-outline" size={22} color={colors.accentText} style={styles.primaryButtonIcon} />
+            <View>
+              <Text style={styles.primaryButtonText}>{t.transferMobile}</Text>
+              <Text style={styles.primaryButtonSubtext}>{t.transferMobileSubtext}</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={() => router.push('/(app)/(tabs)/activity')}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="time-outline" size={22} color={colors.accent} />
+            <Text style={styles.secondaryButtonText}>{t.recentActivity}</Text>
+          </TouchableOpacity>
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -202,7 +240,7 @@ function createStyles(colors) {
       width: 42,
       height: 42,
       borderRadius: 14,
-      backgroundColor: colors.isDark ? 'rgba(13, 148, 136, 0.25)' : 'rgba(13, 148, 136, 0.18)',
+      backgroundColor: colors.isDark ? 'rgba(234, 179, 8, 0.25)' : 'rgba(234, 179, 8, 0.18)',
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -298,9 +336,9 @@ function createStyles(colors) {
       paddingVertical: 20,
       paddingHorizontal: 24,
       borderRadius: 24,
-      backgroundColor: colors.isDark ? 'rgba(13, 148, 136, 0.12)' : 'rgba(13, 148, 136, 0.08)',
+      backgroundColor: colors.isDark ? 'rgba(234, 179, 8, 0.12)' : 'rgba(234, 179, 8, 0.08)',
       borderWidth: 1,
-      borderColor: colors.isDark ? 'rgba(13, 148, 136, 0.2)' : 'rgba(13, 148, 136, 0.15)',
+      borderColor: colors.isDark ? 'rgba(234, 179, 8, 0.2)' : 'rgba(234, 179, 8, 0.15)',
     },
     greeting: {
       fontSize: 13,
@@ -376,6 +414,40 @@ function createStyles(colors) {
       fontSize: 17,
       fontWeight: '600',
       color: colors.text,
+    },
+    guestCard: {
+      backgroundColor: colors.card,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 32,
+      alignItems: 'center',
+    },
+    guestIcon: { marginBottom: 16 },
+    guestTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: colors.text,
+      marginBottom: 10,
+      textAlign: 'center',
+    },
+    guestMessage: {
+      fontSize: 15,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      lineHeight: 22,
+      marginBottom: 24,
+    },
+    guestButton: {
+      backgroundColor: colors.accent,
+      paddingVertical: 14,
+      paddingHorizontal: 28,
+      borderRadius: 14,
+    },
+    guestButtonText: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: colors.accentText,
     },
   });
 }

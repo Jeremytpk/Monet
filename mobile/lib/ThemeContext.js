@@ -11,7 +11,7 @@ const darkColors = {
   text: '#F9FAFB',
   textSecondary: '#9CA3AF',
   muted: '#6B7280',
-  accent: '#0D9488',      // teal — money & peace
+  accent: '#c89705ff',      // teal — money & peace
   accentText: '#FFFFFF',
 };
 
@@ -22,7 +22,7 @@ const lightColors = {
   text: '#0F172A',
   textSecondary: '#64748B',
   muted: '#94A3B8',
-  accent: '#0D9488',     // same teal
+  accent: '#c89705ff',     // same teal
   accentText: '#FFFFFF',
 };
 

@@ -16,9 +16,10 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { signOut } from 'firebase/auth';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../../lib/firebase';
+import { db, storage, auth } from '../../lib/firebase';
 import { useAuth } from '../../lib/useAuth';
 import { useTheme } from '../../lib/ThemeContext';
 import { useLanguage } from '../../lib/LanguageContext';
@@ -29,7 +30,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { user, profile, setProfile, loading: authLoading } = useAuth();
   const { colors } = useTheme();
-  const { t } = useLanguage();
+  const { t, lang, toggleLang } = useLanguage();
   const [editingField, setEditingField] = useState(null);
   const [editValue, setEditValue] = useState('');
   const [saving, setSaving] = useState(false);
@@ -51,6 +52,10 @@ export default function ProfileScreen() {
     { key: 'currency', label: t.fieldCurrency, value: profile?.currency || 'USD', editable: false },
     { key: 'wallet_id', label: t.fieldWalletId, value: profile?.wallet_id || '—', editable: false },
   ];
+
+  if (profile?.mcp_id) {
+    fields.push({ key: 'mcp_id', label: t.fieldMcpId || 'MCP ID', value: profile.mcp_id, editable: false });
+  }
 
   function openEdit(field) {
     const f = fields.find((x) => x.key === field);
@@ -226,6 +231,28 @@ export default function ProfileScreen() {
               )}
             </View>
           ))}
+        </View>
+
+        {/* Language and Logout Actions */}
+        <View style={[styles.card, { marginTop: 24 }]}>
+          <TouchableOpacity style={[styles.row, styles.rowBorder]} onPress={toggleLang}>
+            <View style={styles.rowLeft}>
+              <Text style={styles.rowLabel}>{t.app || 'App'}</Text>
+              <Text style={styles.rowValue}>{lang === 'en' ? 'English' : 'Français'}</Text>
+            </View>
+            <Ionicons name="language" size={20} color={colors.accent} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.row} onPress={async () => {
+            await signOut(auth);
+            router.replace('/(app)/(tabs)/wallet');
+            Alert.alert(t.success, t.successSignedOut, [{ text: t.ok }]);
+          }}>
+            <View style={styles.rowLeft}>
+              <Text style={[styles.rowValue, { color: '#EF4444' }]}>{t.signOut}</Text>
+            </View>
+            <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+          </TouchableOpacity>
         </View>
       </ScrollView>
 

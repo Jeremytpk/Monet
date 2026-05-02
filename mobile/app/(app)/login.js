@@ -9,6 +9,7 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,10 +28,17 @@ export default function LoginModalScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   async function handleSubmit() {
     if (!email.trim() || !password) {
       Alert.alert(t.error, t.emailPasswordRequired);
+      return;
+    }
+    if (isSignUp && password !== confirmPassword) {
+      Alert.alert(t.error, t.passwordsDoNotMatch || 'Passwords do not match');
       return;
     }
     setLoading(true);
@@ -64,6 +72,7 @@ export default function LoginModalScreen() {
       >
         <Ionicons name="close" size={28} color={colors.text} />
       </TouchableOpacity>
+      <Image source={require('../../assets/icon.png')} style={styles.headerLogo} resizeMode="contain" />
       <View style={styles.card}>
         <Text style={styles.logo}>Monet</Text>
         <Text style={styles.tagline}>{t.tagline}</Text>
@@ -77,15 +86,36 @@ export default function LoginModalScreen() {
           keyboardType="email-address"
           editable={!loading}
         />
-        <TextInput
-          style={styles.input}
-          placeholder={t.password}
-          placeholderTextColor={colors.muted}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          editable={!loading}
-        />
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder={t.password}
+            placeholderTextColor={colors.muted}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!showPassword}
+            editable={!loading}
+          />
+          <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon} hitSlop={12}>
+            <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color={colors.muted} />
+          </TouchableOpacity>
+        </View>
+        {isSignUp && (
+          <View style={styles.passwordContainer}>
+            <TextInput
+              style={styles.passwordInput}
+              placeholder={t.confirmPassword || 'Confirm password'}
+              placeholderTextColor={colors.muted}
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry={!showConfirmPassword}
+              editable={!loading}
+            />
+            <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon} hitSlop={12}>
+              <Ionicons name={showConfirmPassword ? 'eye-off' : 'eye'} size={20} color={colors.muted} />
+            </TouchableOpacity>
+          </View>
+        )}
         <TouchableOpacity
           style={[styles.button, loading && styles.buttonDisabled]}
           onPress={handleSubmit}
@@ -126,6 +156,14 @@ function createStyles(colors) {
       zIndex: 10,
       padding: 4,
     },
+    headerLogo: {
+      width: 100,
+      height: 100,
+      alignSelf: 'center',
+      marginBottom: 24,
+      borderRadius: 50,
+      overflow: 'hidden',
+    },
     card: {
       backgroundColor: colors.card,
       borderRadius: 24,
@@ -139,11 +177,13 @@ function createStyles(colors) {
       color: colors.accent,
       letterSpacing: 1,
       marginBottom: 4,
+      textAlign: 'center',
     },
     tagline: {
       fontSize: 16,
       color: colors.textSecondary,
       marginBottom: 32,
+      textAlign: 'center',
     },
     input: {
       backgroundColor: colors.background,
@@ -154,6 +194,24 @@ function createStyles(colors) {
       marginBottom: 14,
       borderWidth: 1,
       borderColor: colors.border,
+    },
+    passwordContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: 14,
+    },
+    passwordInput: {
+      flex: 1,
+      padding: 18,
+      fontSize: 17,
+      color: colors.text,
+    },
+    eyeIcon: {
+      paddingHorizontal: 16,
     },
     button: {
       backgroundColor: colors.accent,

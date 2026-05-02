@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { createWalletUser } from '../../lib/functions';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../../lib/firebase';
@@ -18,6 +19,7 @@ import { useTheme } from '../../lib/ThemeContext';
 import { useLanguage } from '../../lib/LanguageContext';
 
 export default function OnboardingScreen() {
+  const router = useRouter();
   const { setProfile } = useAuth();
   const { colors } = useTheme();
   const { t } = useLanguage();
@@ -56,6 +58,7 @@ export default function OnboardingScreen() {
       }
       const snap = await getDoc(doc(db, 'users', uid));
       setProfile(snap.exists() ? snap.data() : null);
+      router.replace('/(app)/(tabs)/wallet');
     } catch (e) {
       Alert.alert(t.error, e?.message || t.errCreateWallet);
     } finally {

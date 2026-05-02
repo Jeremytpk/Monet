@@ -2,8 +2,8 @@ import { useEffect } from 'react';
 import { View, Image, Text, StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { useRouter, useSegments } from 'expo-router';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '../lib/useAuth';
@@ -25,29 +25,48 @@ function RootLayoutNav() {
   }, []);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
+    let unsubProfile;
+    const unsubAuth = onAuthStateChanged(auth, (u) => {
       setUser(u || null);
       if (!u) {
         setProfile(null);
         setLoading(false);
+        if (unsubProfile) {
+          unsubProfile();
+          unsubProfile = null;
+        }
         return;
       }
-      try {
-        const snap = await getDoc(doc(db, 'users', u.uid));
-        setProfile(snap.exists() ? snap.data() : null);
-      } catch {
-        setProfile(null);
-      } finally {
+      unsubProfile = onSnapshot(doc(db, 'users', u.uid), async (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          setProfile(data);
+          if (data.force_logout) {
+            try { await updateDoc(doc(db, 'users', u.uid), { force_logout: false }); } catch (e) {}
+            await signOut(auth);
+            router.replace('/(app)/(tabs)/wallet');
+          }
+        } else {
+          setProfile(null);
+        }
         setLoading(false);
-      }
+      });
     });
-    return () => unsub();
+    return () => {
+      unsubAuth();
+      if (unsubProfile) unsubProfile();
+    };
   }, []);
 
   useEffect(() => {
     if (loading) return;
     if (user && (!profile || !profile.wallet_id)) {
       router.replace('/(auth)/onboarding');
+      return;
+    }
+    // If user has 'mcp' role, redirect to MCP Dashboard
+    if (user && profile && String(profile.role || '').toLowerCase() === 'mcp') {
+      router.replace('/(app)/admin/mcp-dashboard');
       return;
     }
     if (!isInsideApp) {
@@ -59,7 +78,8 @@ function RootLayoutNav() {
     return (
       <View style={styles.container}>
         <StatusBar style="light" />
-        <Image source={require('../assets/splash.png')} style={styles.logo} resizeMode="contain" />
+        <Text style={styles.appName}>Monet</Text>
+        <Image source={require('../assets/icon.png')} style={styles.logo} resizeMode="contain" />
         <Text style={styles.poweredBy}>powered by Jerttech</Text>
       </View>
     );
@@ -80,9 +100,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  appName: {
+    fontSize: 42,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginBottom: 40,
+    letterSpacing: 2,
+  },
   logo: {
-    width: '60%',
-    height: '60%',
+    width: 140,
+    height: 140,
   },
   poweredBy: {
     position: 'absolute',

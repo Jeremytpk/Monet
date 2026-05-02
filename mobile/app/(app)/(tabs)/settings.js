@@ -134,6 +134,19 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t.account}</Text>
         <View style={styles.card}>
+          {String(profile?.role || '').toLowerCase() === 'admin' ? (
+            <TouchableOpacity
+              style={styles.rowButton}
+              onPress={() => router.push('/(app)/admin')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.rowButtonLeft}>
+                <Ionicons name="shield-checkmark-outline" size={22} color={colors.accent} style={styles.rowIcon} />
+                <Text style={[styles.rowButtonLabel, { color: colors.text }]}>Admin Dashboard</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+            </TouchableOpacity>
+          ) : null}
           <TouchableOpacity
             style={styles.rowButton}
             onPress={async () => {

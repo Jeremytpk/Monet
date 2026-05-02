@@ -13,5 +13,36 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow create, update, delete: if false; // only Cloud Functions write
     }
+
+    // Ads: public read (home banner), writes restricted to Admin users
+    match /ads/{adId} {
+      // Allow everyone to read ads so the home banner can display them without permission errors
+      allow read: if true;
+
+      // Only allow authenticated users whose profile role (case-insensitive) is 'admin' to write
+      allow create, update, delete: if request.auth != null &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role != null &&
+         toLower(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role) == 'admin');
+    }
+
+    // MPA Accounts: only the MCP (Money Partner Account owner) can read/write their own
+    match /mpa_accounts/{mcpUid} {
+      allow read, write: if request.auth != null && request.auth.uid == mcpUid;
+    }
+
+    // MPA Transactions: only the MCP can read their own transaction history; only Cloud Functions write
+    match /mpa_accounts/{mcpUid}/transactions/{txId} {
+      allow read: if request.auth != null && request.auth.uid == mcpUid;
+      allow create, update, delete: if false; // only Cloud Functions write
+    }
+
+    // Kiosk Transactions: users can read their own pending codes; Cloud Functions manage writes
+    match /kiosk_transactions/{txId} {
+      allow read: if request.auth != null && (
+        request.auth.uid == resource.data.user_uid ||
+        request.auth.uid == resource.data.mcp_uid
+      );
+      allow create, update, delete: if false; // only Cloud Functions write
+    }
   }
 }
