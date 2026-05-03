@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Alert, Modal, TextInput, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
@@ -17,6 +17,9 @@ export default function AdminActivitiesScreen() {
 
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchText, setSearchText] = useState('');
+  const [selectedActivity, setSelectedActivity] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
     if (!user || String(profile?.role || '').toLowerCase() !== 'admin') {
@@ -76,6 +79,16 @@ export default function AdminActivitiesScreen() {
     });
   };
 
+  const openModal = (item) => {
+    setSelectedActivity(item);
+    setModalVisible(true);
+  };
+
+  const closeModal = () => {
+    setModalVisible(false);
+    setSelectedActivity(null);
+  };
+
   const renderItem = ({ item }) => {
     if (item._type === 'user') {
       return (
@@ -126,7 +139,7 @@ export default function AdminActivitiesScreen() {
     const receiverLabel = item.receiver_id ? item.receiver_id.slice(0, 8) + '...' : '';
 
     return (
-      <View style={styles.card}>
+      <TouchableOpacity onPress={() => openModal(item)} style={styles.card} activeOpacity={0.8}>
         <View style={[styles.iconWrap, { backgroundColor: bgOpacity }]}>
           <Ionicons name={iconName} size={24} color={iconColor} />
         </View>
@@ -143,20 +156,22 @@ export default function AdminActivitiesScreen() {
           </Text>
           <Text style={styles.cardDate}>{formatDate(item._date)}</Text>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={12}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <View>
-          <Text style={styles.headerTitle}>Global Activity</Text>
-          <Text style={styles.headerSubtitle}>Admin Dashboard</Text>
-        </View>
+      {/* header removed per request */}
+
+      <View style={styles.searchWrap}>
+        <TextInput
+          placeholder="Search by user, kiosk, date..."
+          placeholderTextColor={colors.muted}
+          value={searchText}
+          onChangeText={setSearchText}
+          style={styles.searchInput}
+        />
       </View>
 
       {loading ? (
@@ -165,13 +180,52 @@ export default function AdminActivitiesScreen() {
         </View>
       ) : (
         <FlatList
-          data={activities}
+          data={activities.filter((it) => {
+            if (!searchText) return true;
+            const q = searchText.toLowerCase();
+            const owner = (it._owner_name || '').toLowerCase();
+            const kiosk = ((it.kiosk_name || it.kiosk?.name) || '').toLowerCase();
+            const dateStr = formatDate(it._date).toLowerCase();
+            return owner.includes(q) || kiosk.includes(q) || dateStr.includes(q);
+          })}
           keyExtractor={(item) => item.id + item._type}
           contentContainerStyle={styles.list}
           renderItem={renderItem}
           ListEmptyComponent={<Text style={styles.emptyText}>No recent activity found.</Text>}
         />
       )}
+
+      {/* Details modal */}
+      <Modal visible={modalVisible} animationType="slide" transparent={true} onRequestClose={closeModal}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Activity Details</Text>
+              <TouchableOpacity onPress={closeModal}>
+                <Text style={{ color: colors.accent, fontWeight: '600' }}>Close</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalBody}>
+              {selectedActivity ? (
+                Object.entries(selectedActivity).map(([k, v]) => {
+                  if (['withdrawal_code', 'code', 'kiosk_code'].includes(k)) return null;
+                  let value = v;
+                  if (k === 'timestamp' || k === '_date') value = formatDate(selectedActivity._date || new Date(0));
+                  if (typeof value === 'object') value = JSON.stringify(value);
+                  return (
+                    <View key={k} style={styles.detailRow}>
+                      <Text style={[styles.detailKey, { color: colors.textSecondary }]}>{k}</Text>
+                      <Text style={[styles.detailVal, { color: colors.text }]}>{String(value)}</Text>
+                    </View>
+                  );
+                })
+              ) : (
+                <Text style={styles.emptyText}>No details</Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
