@@ -1,41 +1,220 @@
-import { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet } from 'react-native';
-import { useTheme } from '../../../lib/ThemeContext';
-import { useAuth } from '../../../lib/useAuth';
+import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { useAuth } from '../../../lib/useAuth';
+import { useTheme } from '../../../lib/ThemeContext';
+import { useLanguage } from '../../../lib/LanguageContext';
 
-export default function AdminActivities() {
+export default function AdminActivitiesScreen() {
+  const { user, profile } = useAuth();
   const { colors } = useTheme();
-  const { profile } = useAuth();
+  const { t } = useLanguage();
+  const router = useRouter();
+  const styles = createStyles(colors);
+
   const [activities, setActivities] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-  if (!profile || String(profile.role || '').toLowerCase() !== 'admin') return;
-    const q = query(collection(db, 'activities'), orderBy('timestamp', 'desc'));
-    const unsub = onSnapshot(q, (snap) => {
-      setActivities(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    }, (err) => { console.warn('activities onSnapshot error', err); });
-    return () => unsub();
-  }, [profile?.role]);
+    if (!user || String(profile?.role || '').toLowerCase() !== 'admin') {
+      Alert.alert(t.error || 'Error', 'Unauthorized access.');
+      router.back();
+      return;
+    }
 
-  if (!profile || String(profile.role || '').toLowerCase() !== 'admin') return null;
+    async function fetchGlobalActivity() {
+      try {
+        // 1. Fetch Global Activities from the top-level `activities` collection.
+        // Cloud Functions write structured activity logs via `logActivity(...)`.
+        const activitiesQuery = query(
+          collection(db, 'activities'),
+          orderBy('timestamp', 'desc'),
+          limit(200)
+        );
+        const actSnap = await getDocs(activitiesQuery);
+        const actList = actSnap.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+          _type: 'activity',
+          _date: d.data().timestamp?.toDate() || new Date(0),
+        }));
 
-  const renderItem = ({ item }) => (
-    <View style={[styles.row, { borderColor: colors.border }]}> 
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.name, { color: colors.text }]}>{item.action}</Text>
-        <Text style={{ color: colors.textSecondary }}>{item.actor_uid || 'system'} • {new Date(item.timestamp?.toDate?.() || Date.now()).toLocaleString()}</Text>
-        <Text style={{ color: colors.textSecondary }}>{JSON.stringify(item.metadata || {})}</Text>
+        // Merge with recent user registrations as separate entries if desired
+        const userQuery = query(
+          collection(db, 'users'),
+          orderBy('created_at', 'desc'),
+          limit(100)
+        );
+        const userSnap = await getDocs(userQuery);
+        const userList = userSnap.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+          _type: 'user',
+          _date: d.data().created_at?.toDate() || new Date(0),
+        }));
+
+        // Merge and sort newest first
+        const combined = [...actList, ...userList].sort((a, b) => b._date - a._date);
+        setActivities(combined);
+      } catch (err) {
+        console.error('Error fetching global activities:', err);
+        Alert.alert(
+          t.error || 'Error',
+          `Failed to load activities. Check the console for the index link, or deploy firestore.indexes.json.\n\nDetails: ${err.message}`
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchGlobalActivity();
+  }, [user, profile]);
+
+  const formatDate = (date) => {
+    return date.toLocaleDateString(undefined, {
+      month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
+  };
+
+  const renderItem = ({ item }) => {
+    if (item._type === 'user') {
+      return (
+        <View style={styles.card}>
+          <View style={[styles.iconWrap, { backgroundColor: 'rgba(59, 130, 246, 0.15)' }]}>
+            <Ionicons name="person-add" size={24} color="#3B82F6" />
+          </View>
+          <View style={styles.cardContent}>
+            <Text style={styles.cardTitle}>New User Registration</Text>
+            <Text style={styles.cardSubtitle}>{item.name || 'No Name'} • {item.phone || 'No Phone'}</Text>
+            <Text style={styles.cardDate}>{formatDate(item._date)}</Text>
+          </View>
+        </View>
+      );
+    }
+
+    // Transaction styling mapping
+    let iconName = 'swap-horizontal';
+    let iconColor = colors.accent;
+    let bgOpacity = colors.isDark ? 'rgba(234, 179, 8, 0.2)' : 'rgba(234, 179, 8, 0.15)';
+
+    const tType = (item.type || '').toLowerCase();
+
+    if (tType === 'deposit' || tType === 'incoming_transfer') {
+      iconName = 'arrow-down';
+      iconColor = '#22C55E'; // Green
+      bgOpacity = 'rgba(34, 197, 94, 0.15)';
+    } else if (tType === 'withdrawal' || tType === 'kiosk_withdrawal' || tType === 'outgoing_transfer') {
+      iconName = 'arrow-up';
+      iconColor = '#EF4444'; // Red
+      bgOpacity = 'rgba(239, 68, 68, 0.15)';
+    } else if (tType.includes('top_up') || tType.includes('topup')) {
+      iconName = 'phone-portrait-outline';
+      iconColor = '#3B82F6'; // Blue
+      bgOpacity = 'rgba(59, 130, 246, 0.15)';
+    } else if (tType.includes('mobile_money') || tType.includes('mobile')) {
+      iconName = 'phone-landscape-outline';
+      iconColor = '#F97316'; // Orange
+      bgOpacity = 'rgba(249, 115, 22, 0.15)';
+    }
+
+    const userId = item.sender_id || item._owner_id;
+    const userLabel = userId ? userId.slice(0, 8) + '...' : 'System';
+    const receiverLabel = item.receiver_id ? item.receiver_id.slice(0, 8) + '...' : '';
+
+    return (
+      <View style={styles.card}>
+        <View style={[styles.iconWrap, { backgroundColor: bgOpacity }]}>
+          <Ionicons name={iconName} size={24} color={iconColor} />
+        </View>
+        <View style={styles.cardContent}>
+          <Text style={styles.cardTitle}>
+            {item.type ? item.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Transaction'}
+          </Text>
+          <Text style={styles.cardSubtitle}>
+            Amount: ${Number(item.amount || 0).toFixed(2)} • Status: {item.status || 'N/A'}
+            {item.provider ? ` • ${item.provider}` : ''}
+          </Text>
+          <Text style={styles.cardSubtitle}>
+            By: {userLabel} {receiverLabel ? `→ To: ${receiverLabel}` : ''}
+          </Text>
+          <Text style={styles.cardDate}>{formatDate(item._date)}</Text>
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
-    <View style={[{ flex: 1, backgroundColor: colors.background, padding: 24 }]}> 
-      <FlatList data={activities} keyExtractor={(i) => i.id} renderItem={renderItem} ItemSeparatorComponent={() => <View style={{ height: 12 }} />} />
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={12}>
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <View>
+          <Text style={styles.headerTitle}>Global Activity</Text>
+          <Text style={styles.headerSubtitle}>Admin Dashboard</Text>
+        </View>
+      </View>
+
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={colors.accent} />
+        </View>
+      ) : (
+        <FlatList
+          data={activities}
+          keyExtractor={(item) => item.id + item._type}
+          contentContainerStyle={styles.list}
+          renderItem={renderItem}
+          ListEmptyComponent={<Text style={styles.emptyText}>No recent activity found.</Text>}
+        />
+      )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({ row: { flexDirection: 'row', alignItems: 'center', padding: 12, borderWidth: 1, borderRadius: 10 }, name: { fontSize: 16, fontWeight: '600' } });
+function createStyles(colors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingTop: 56,
+      paddingBottom: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      backgroundColor: colors.card,
+    },
+    backBtn: { marginRight: 16, padding: 4 },
+    headerTitle: { fontSize: 20, fontWeight: '700', color: colors.text },
+    headerSubtitle: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    list: { padding: 16 },
+    emptyText: { textAlign: 'center', color: colors.muted, marginTop: 32, fontSize: 15 },
+    card: {
+      flexDirection: 'row',
+      backgroundColor: colors.card,
+      padding: 16,
+      borderRadius: 16,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: 'center',
+    },
+    iconWrap: {
+      width: 48,
+      height: 48,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 16,
+    },
+    cardContent: { flex: 1 },
+    cardTitle: { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 4 },
+    cardSubtitle: { fontSize: 13, color: colors.textSecondary, marginBottom: 2 },
+    cardDate: { fontSize: 12, color: colors.muted, marginTop: 4 },
+  });
+}
