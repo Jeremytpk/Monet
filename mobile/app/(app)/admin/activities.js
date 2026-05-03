@@ -27,37 +27,34 @@ export default function AdminActivitiesScreen() {
 
     async function fetchGlobalActivity() {
       try {
-        // 1. Fetch Global Activities from the top-level `activities` collection.
-        // Cloud Functions write structured activity logs via `logActivity(...)`.
-        const activitiesQuery = query(
-          collection(db, 'activities'),
-          orderBy('timestamp', 'desc'),
-          limit(200)
-        );
-        const actSnap = await getDocs(activitiesQuery);
-        const actList = actSnap.docs.map((d) => ({
-          id: d.id,
-          ...d.data(),
-          _type: 'activity',
-          _date: d.data().timestamp?.toDate() || new Date(0),
-        }));
-
-        // Merge with recent user registrations as separate entries if desired
-        const userQuery = query(
-          collection(db, 'users'),
-          orderBy('created_at', 'desc'),
-          limit(100)
-        );
+        // Fetch transactions from each user's `transactions` subcollection.
+        // This avoids a collectionGroup query (and its index) by querying per-user.
+        const userQuery = query(collection(db, 'users'), orderBy('created_at', 'desc'), limit(200));
         const userSnap = await getDocs(userQuery);
-        const userList = userSnap.docs.map((d) => ({
-          id: d.id,
-          ...d.data(),
-          _type: 'user',
-          _date: d.data().created_at?.toDate() || new Date(0),
-        }));
+        const userIds = userSnap.docs.map((d) => d.id);
 
-        // Merge and sort newest first
-        const combined = [...actList, ...userList].sort((a, b) => b._date - a._date);
+        // Build a map of userId -> userData so we can show names instead of ids
+        const userMap = new Map(userSnap.docs.map((d) => [d.id, d.data()]));
+
+        // For each user, fetch their most recent transactions (limit per user to avoid heavy reads)
+        const txPromises = userIds.map(async (uid) => {
+          const txQ = query(collection(db, 'users', uid, 'transactions'), orderBy('timestamp', 'desc'), limit(25));
+          const snap = await getDocs(txQ);
+          return snap.docs.map((d) => ({
+            id: d.id,
+            ...d.data(),
+            _type: 'transaction',
+            _date: d.data().timestamp?.toDate() || new Date(0),
+            _owner_id: uid,
+            _owner_name: (userMap.get(uid)?.name) || (userMap.get(uid)?.displayName) || null,
+          }));
+        });
+
+        const txArrays = await Promise.all(txPromises);
+        const txList = txArrays.flat();
+
+        // Sort transactions newest-first and show them as the combined list
+        const combined = txList.sort((a, b) => b._date - a._date).slice(0, 200);
         setActivities(combined);
       } catch (err) {
         console.error('Error fetching global activities:', err);
@@ -121,7 +118,11 @@ export default function AdminActivitiesScreen() {
     }
 
     const userId = item.sender_id || item._owner_id;
-    const userLabel = userId ? userId.slice(0, 8) + '...' : 'System';
+    const userLabel = item._owner_name
+      ? item._owner_name
+      : userId
+      ? userId.slice(0, 8) + '...'
+      : 'System';
     const receiverLabel = item.receiver_id ? item.receiver_id.slice(0, 8) + '...' : '';
 
     return (
