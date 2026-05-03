@@ -133,6 +133,11 @@ const translations = {
     app: 'App',
     version: 'Version',
     successSignedOut: 'You have been signed out successfully.',
+    about: 'About',
+    aboutApp: 'About the App',
+    // About screen description
+    aboutDescription:
+      'Monet is a cross-border financial ecosystem designed for the African diaspora to seamlessly and securely send funds to the Democratic Republic of Congo (DRC).',
 
     // Profile screen
     profile: 'Profile',
@@ -264,6 +269,35 @@ const translations = {
     errKioskWalletOnly: 'Kiosk withdrawals must be funded from your Wallet balance.',
     errAmountAndMcpId: 'Please enter amount and the Kiosk MCP ID',
     errMcpNotFound: 'Could not find a kiosk partner with that MCP ID. Please check the ID and try again.',
+
+    // Admin & Activities
+    unauthorized_access: 'Unauthorized access.',
+    failed_load_activities: 'Failed to load activities.',
+    new_user_registration: 'New User Registration',
+    no_name: 'No name',
+    no_phone: 'No phone',
+    transaction: 'Transaction',
+    by: 'By',
+    to: 'To',
+    system: 'System',
+    search_placeholder: 'Search by user, kiosk, date...',
+    all: 'All',
+    kiosk: 'Kiosk',
+    mobile_money: 'Mobile Money',
+    top_up: 'Top Up',
+    total_transactions: 'Total Transactions:',
+    no_recent_activity: 'No recent activity found.',
+    activity_details: 'Activity Details',
+    no_details: 'No details',
+    cancel_transaction: 'Cancel transaction',
+    cancel_transaction_msg: 'This will reverse the transaction and return funds. Continue?',
+    cancelled: 'Cancelled',
+    search_name_id_ref: 'Search by name, ID, or reference...',
+    na: 'N/A',
+    completed: 'Completed',
+    pending: 'Pending',
+    failed: 'Failed',
+    status: 'Status',
   },
   fr: {
     // Common
@@ -394,6 +428,11 @@ const translations = {
     app: 'Application',
     version: 'Version',
     successSignedOut: 'Vous avez été déconnecté avec succès.',
+    about: 'À propos',
+    aboutApp: 'À propos de l\'application',
+    // About screen description
+    aboutDescription:
+      "Monet est un écosystème financier transfrontalier conçu pour que la diaspora africaine puisse envoyer des fonds vers la République démocratique du Congo (RDC) de façon fluide et sécurisée.",
 
     // Profile screen
     profile: 'Profil',
@@ -525,6 +564,35 @@ const translations = {
     errKioskWalletOnly: 'Les retraits en kiosque doivent être financés depuis le solde de votre portefeuille.',
     errAmountAndMcpId: "Veuillez entrer le montant et l'ID MCP du kiosque",
     errMcpNotFound: "Impossible de trouver un partenaire kiosque avec cet ID MCP. Veuillez vérifier l'ID et réessayer.",
+
+    // Admin & Activities
+    unauthorized_access: 'Accès non autorisé.',
+    failed_load_activities: 'Échec du chargement des activités.',
+    new_user_registration: 'Nouvel utilisateur',
+    no_name: 'Pas de nom',
+    no_phone: 'Pas de téléphone',
+    transaction: 'Transaction',
+    by: 'Par',
+    to: 'À',
+    system: 'Système',
+    search_placeholder: 'Rechercher par utilisateur, kiosque, date...',
+    all: 'Tous',
+    kiosk: 'Kiosque',
+    mobile_money: 'Mobile Money',
+    top_up: 'Recharge',
+    total_transactions: 'Total des transactions :',
+    no_recent_activity: 'Aucune activité récente trouvée.',
+    activity_details: 'Détails de l\'activité',
+    no_details: 'Aucun détail',
+    cancel_transaction: 'Annuler la transaction',
+    cancel_transaction_msg: 'Cela annulera la transaction et restituera les fonds. Continuer ?',
+    cancelled: 'Annulée',
+    search_name_id_ref: 'Rechercher par nom, ID ou référence...',
+    na: 'N/D',
+    completed: 'Terminé',
+    pending: 'En attente',
+    failed: 'Échoué',
+    status: 'Statut',
   },
 };
 
@@ -532,11 +600,12 @@ const LanguageContext = createContext(null);
 
 export function LanguageProvider({ children }) {
   const [lang, setLangState] = useState('en');
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem(LANG_KEY).then((saved) => {
       if (saved === 'en' || saved === 'fr') setLangState(saved);
-    });
+    }).finally(() => setReady(true));
   }, []);
 
   const setLang = (value) => {
@@ -547,6 +616,8 @@ export function LanguageProvider({ children }) {
   const toggleLang = () => setLang(lang === 'en' ? 'fr' : 'en');
 
   const t = translations[lang];
+
+  if (!ready) return null;
 
   return (
     <LanguageContext.Provider value={{ lang, setLang, toggleLang, t }}>
