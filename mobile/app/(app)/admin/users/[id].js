@@ -22,7 +22,18 @@ export default function UserDetail() {
   useEffect(() => {
     if (!id) return;
     const ref = doc(db, 'users', id);
-    getDoc(ref).then((snap) => { if (snap.exists()) { setUser(snap.data()); setName(snap.data().name || ''); setPhone(snap.data().phone || ''); setRole(snap.data().role || ''); } });
+    const unsubUser = onSnapshot(ref, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setUser(data);
+        setName(data.name || '');
+        setPhone(data.phone || '');
+        setRole(data.role || '');
+      } else {
+        setUser(null);
+        setName(''); setPhone(''); setRole('');
+      }
+    }, (err) => { console.warn('user onSnapshot error', err); });
 
     const q = query(collection(db, `users/${id}/transactions`), orderBy('timestamp', 'desc'));
     const unsubTx = onSnapshot(q, (snap) => {
@@ -34,7 +45,7 @@ export default function UserDetail() {
       setActivities(snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter(a => a.target_uid === id));
     }, (err) => { console.warn('activities onSnapshot error', err); });
 
-    return () => { unsubTx(); unsubAct(); };
+    return () => { unsubTx(); unsubAct(); if (unsubUser) unsubUser(); };
   }, [id]);
 
   if (!id) return null;
@@ -122,12 +133,21 @@ export default function UserDetail() {
       ))}
 
       <Text style={{ color: colors.textSecondary, marginTop: 14, marginBottom: 8 }}>Recent Activities</Text>
-      {activities.map((a) => (
-        <View key={a.id} style={{ backgroundColor: colors.card, padding: 12, borderRadius: 10, marginBottom: 8 }}>
-          <Text style={{ color: colors.text }}>{a.action}</Text>
-          <Text style={{ color: colors.textSecondary }}>{JSON.stringify(a.metadata || {})}</Text>
-        </View>
-      ))}
+      {activities.map((a) => {
+        const meta = a.metadata || {};
+        const parts = [];
+        if (meta.amount != null) parts.push(`$${Number(meta.amount).toFixed(2)}`);
+        if (meta.tx_id) parts.push(`tx:${meta.tx_id}`);
+        if (meta.from) parts.push(`from:${meta.from}`);
+        if (meta.to) parts.push(`to:${meta.to}`);
+        const metaText = parts.length ? parts.join(' • ') : JSON.stringify(meta);
+        return (
+          <View key={a.id} style={{ backgroundColor: colors.card, padding: 12, borderRadius: 10, marginBottom: 8 }}>
+            <Text style={{ color: colors.text }}>{a.action}</Text>
+            <Text style={{ color: colors.textSecondary }}>{metaText}</Text>
+          </View>
+        );
+      })}
 
     </ScrollView>
   );
