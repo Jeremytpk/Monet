@@ -1,0 +1,11 @@
+{
+  "build": {
+    "production": {
+      "workflow": "managed",
+      "distribution": "internal",
+      "ios": {
+        "simulator": false
+      }
+    }
+  }
+}

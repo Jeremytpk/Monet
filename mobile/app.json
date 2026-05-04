@@ -24,6 +24,16 @@
       },
       "package": "com.jerttech.monet"
     },
-    "plugins": ["expo-router", ["expo-image-picker", { "photosPermission": "Allow Monet to access your photos for your profile picture.", "cameraPermission": "Allow Monet to use your camera to take a profile photo." }]]
+    "plugins": [
+      "expo-router",
+      "expo-updates",
+      ["expo-image-picker", { "photosPermission": "Allow Monet to access your photos for your profile picture.", "cameraPermission": "Allow Monet to use your camera to take a profile photo." }]
+    ],
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    }
   }
 }
