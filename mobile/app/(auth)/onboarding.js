@@ -57,7 +57,23 @@ export default function OnboardingScreen() {
         }
       }
       const snap = await getDoc(doc(db, 'users', uid));
-      setProfile(snap.exists() ? snap.data() : null);
+      const data = snap.exists() ? snap.data() : null;
+      setProfile(data);
+      // Redirect based on role/wallet presence
+      const role = String(data?.role || '').toLowerCase();
+      if (!data || !data.wallet_id) {
+        // stay on onboarding or show error — but we've just created wallet_id above, so fallback to wallet
+        router.replace('/(app)/(tabs)/wallet');
+        return;
+      }
+      if (role === 'mcp') {
+        router.replace('/(app)/admin/mcp-dashboard');
+        return;
+      }
+      if (role === 'admin') {
+        router.replace('/(app)/admin');
+        return;
+      }
       router.replace('/(app)/(tabs)/wallet');
     } catch (e) {
       Alert.alert(t.error, e?.message || t.errCreateWallet);
