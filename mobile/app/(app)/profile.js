@@ -29,7 +29,7 @@ const AVATAR_SIZE = 128;
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, profile, setProfile, loading: authLoading } = useAuth();
-  const { colors } = useTheme();
+  const { colors, isDark, setTheme } = useTheme();
   const { t, lang, toggleLang } = useLanguage();
   const [editingField, setEditingField] = useState(null);
   const [editValue, setEditValue] = useState('');
@@ -241,6 +241,14 @@ export default function ProfileScreen() {
               <Text style={styles.rowValue}>{lang === 'en' ? 'English' : 'Français'}</Text>
             </View>
             <Ionicons name="language" size={20} color={colors.accent} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.row, styles.rowBorder]} onPress={() => setTheme(isDark ? 'light' : 'dark')}>
+            <View style={styles.rowLeft}>
+              <Text style={styles.rowLabel}>Appearance</Text>
+              <Text style={styles.rowValue}>{isDark ? 'Dark' : 'Light'}</Text>
+            </View>
+            <Ionicons name={isDark ? 'moon' : 'sunny'} size={20} color={colors.accent} />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.row} onPress={async () => {
