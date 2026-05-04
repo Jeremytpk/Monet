@@ -14,10 +14,56 @@ export default function UserDetail() {
   const [user, setUser] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [activities, setActivities] = useState([]);
+  const [showAllTransactions, setShowAllTransactions] = useState(false);
+  const [showAllActivities, setShowAllActivities] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState('');
   const [addAmount, setAddAmount] = useState('');
+
+  // Helper: format metadata (arrays, nested objects) into readable text
+  function formatMeta(meta) {
+    if (!meta) return '';
+    if (Array.isArray(meta)) return meta.join(', ');
+    if (typeof meta === 'object') {
+      const parts = [];
+
+      const isFirestoreTimestamp = (v) => v && typeof v.seconds === 'number' && typeof v.nanoseconds === 'number';
+      const tsToString = (v) => new Date(v.seconds * 1000 + Math.floor((v.nanoseconds || 0) / 1e6)).toLocaleString();
+
+      // If there's an `updates` object (common for edit_user activities), unwrap it
+      if (meta.updates && typeof meta.updates === 'object') {
+        Object.keys(meta.updates).forEach((k) => {
+          const v = meta.updates[k];
+          if (v == null) return;
+          if (isFirestoreTimestamp(v)) parts.push(`${k}:${tsToString(v)}`);
+          else if (Array.isArray(v)) parts.push(`${k}:${v.join(',')}`);
+          else if (typeof v === 'object') parts.push(`${k}:{...}`);
+          else parts.push(`${k}:${String(v)}`);
+        });
+      }
+
+      // Common simple fields
+      if (meta.amount != null) parts.push(`$${Number(meta.amount).toFixed(2)}`);
+      if (meta.tx_id) parts.push(`tx:${meta.tx_id}`);
+      if (meta.from) parts.push(`from:${meta.from}`);
+      if (meta.to) parts.push(`to:${meta.to}`);
+
+      // Any remaining top-level keys (not `updates`) include them
+      Object.keys(meta).forEach((k) => {
+        if (['amount', 'tx_id', 'from', 'to', 'updates'].includes(k)) return;
+        const v = meta[k];
+        if (v == null) return;
+        if (isFirestoreTimestamp(v)) parts.push(`${k}:${tsToString(v)}`);
+        else if (Array.isArray(v)) parts.push(`${k}:${v.join(',')}`);
+        else if (typeof v === 'object') parts.push(`${k}:{...}`);
+        else parts.push(`${k}:${String(v)}`);
+      });
+
+      return parts.join(' • ');
+    }
+    return String(meta);
+  }
 
   useEffect(() => {
     if (!id) return;
@@ -52,7 +98,7 @@ export default function UserDetail() {
 
   const handleSave = async () => {
     try {
-      await adminEditUser(id, { name, phone, role });
+      await adminEditUser(id, { name, phone });
       Alert.alert('Saved');
     } catch (err) { Alert.alert('Error', err.message || String(err)); }
   };
@@ -97,7 +143,9 @@ export default function UserDetail() {
 
       <View style={{ marginBottom: 14 }}>
         <Text style={{ color: colors.textSecondary, marginBottom: 6 }}>Role</Text>
-        <TextInput value={role} onChangeText={setRole} style={{ backgroundColor: colors.card, padding: 12, borderRadius: 10, color: colors.text }} />
+        <View style={{ backgroundColor: colors.card, padding: 12, borderRadius: 10 }}>
+          <Text style={{ color: colors.text }}>{role || 'User'}</Text>
+        </View>
       </View>
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
@@ -125,29 +173,54 @@ export default function UserDetail() {
       </View>
 
       <Text style={{ color: colors.textSecondary, marginBottom: 8 }}>Recent Transactions</Text>
-      {transactions.map((t) => (
-        <View key={t.id} style={{ backgroundColor: colors.card, padding: 12, borderRadius: 10, marginBottom: 8 }}>
-          <Text style={{ color: colors.text }}>{t.type} • ${t.amount}</Text>
-          <Text style={{ color: colors.textSecondary }}>{t.status}</Text>
-        </View>
-      ))}
+      {
+        (() => {
+          const LIMIT = 5;
+          const displayed = showAllTransactions ? transactions : transactions.slice(0, LIMIT);
+          return (
+            <>
+              {displayed.map((t) => (
+                <View key={t.id} style={{ backgroundColor: colors.card, padding: 12, borderRadius: 10, marginBottom: 8 }}>
+                  <Text style={{ color: colors.text }}>{t.type} • ${t.amount}</Text>
+                  <Text style={{ color: colors.textSecondary }}>{t.status} • {t.timestamp?.toDate?.()?.toLocaleString?.() || 'N/A'}</Text>
+                </View>
+              ))}
+              {transactions.length > LIMIT && (
+                <TouchableOpacity onPress={() => setShowAllTransactions((v) => !v)} style={{ padding: 8, alignItems: 'center' }}>
+                  <Text style={{ color: colors.accent }}>{showAllTransactions ? 'Show less' : `Show all ${transactions.length}`}</Text>
+                </TouchableOpacity>
+              )}
+            </>
+          );
+        })()
+      }
 
       <Text style={{ color: colors.textSecondary, marginTop: 14, marginBottom: 8 }}>Recent Activities</Text>
-      {activities.map((a) => {
-        const meta = a.metadata || {};
-        const parts = [];
-        if (meta.amount != null) parts.push(`$${Number(meta.amount).toFixed(2)}`);
-        if (meta.tx_id) parts.push(`tx:${meta.tx_id}`);
-        if (meta.from) parts.push(`from:${meta.from}`);
-        if (meta.to) parts.push(`to:${meta.to}`);
-        const metaText = parts.length ? parts.join(' • ') : JSON.stringify(meta);
-        return (
-          <View key={a.id} style={{ backgroundColor: colors.card, padding: 12, borderRadius: 10, marginBottom: 8 }}>
-            <Text style={{ color: colors.text }}>{a.action}</Text>
-            <Text style={{ color: colors.textSecondary }}>{metaText}</Text>
-          </View>
-        );
-      })}
+      {
+        (() => {
+          const LIMIT = 5;
+          const displayed = showAllActivities ? activities : activities.slice(0, LIMIT);
+          return (
+            <>
+              {displayed.map((a) => {
+                const meta = a.metadata || {};
+                const metaText = formatMeta(meta) || '';
+                return (
+                  <View key={a.id} style={{ backgroundColor: colors.card, padding: 12, borderRadius: 10, marginBottom: 8 }}>
+                    <Text style={{ color: colors.text }}>{a.action}</Text>
+                    <Text style={{ color: colors.textSecondary }}>{metaText} {a.timestamp ? `• ${a.timestamp?.toDate?.()?.toLocaleString?.() || ''}` : ''}</Text>
+                  </View>
+                );
+              })}
+              {activities.length > LIMIT && (
+                <TouchableOpacity onPress={() => setShowAllActivities((v) => !v)} style={{ padding: 8, alignItems: 'center' }}>
+                  <Text style={{ color: colors.accent }}>{showAllActivities ? 'Show less' : `Show all ${activities.length}`}</Text>
+                </TouchableOpacity>
+              )}
+            </>
+          );
+        })()
+      }
 
     </ScrollView>
   );
