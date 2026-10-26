@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { createWalletUser } from '../../lib/functions';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../../lib/firebase';
 import { useAuth } from '../../lib/useAuth';
 import { useTheme } from '../../lib/ThemeContext';
@@ -38,24 +38,8 @@ export default function OnboardingScreen() {
     setLoading(true);
     try {
       const uid = auth.currentUser.uid;
-      try {
-        await createWalletUser(trimmedName, trimmedPhone, 'USD');
-      } catch (fnErr) {
-        const code = fnErr?.code || '';
-        const isNotFound = code === 'functions/not-found' || code === 'functions/unavailable' || /not-found|not found/i.test(fnErr?.message || '');
-        if (isNotFound) {
-          await setDoc(doc(db, 'users', uid), {
-            name: trimmedName,
-            phone: trimmedPhone,
-            wallet_id: `monet_${uid}`,
-            wallet_balance: 0,
-            currency: 'USD',
-            updated_at: serverTimestamp(),
-          }, { merge: true });
-        } else {
-          throw fnErr;
-        }
-      }
+      // Wallets are created server-side only; the client may not set wallet fields.
+      await createWalletUser(trimmedName, trimmedPhone, 'USD');
       const snap = await getDoc(doc(db, 'users', uid));
       const data = snap.exists() ? snap.data() : null;
       setProfile(data);

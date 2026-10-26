@@ -13,6 +13,7 @@ import { getStorage } from 'firebase-admin/storage';
 import { initializeApp } from 'firebase-admin/app';
 import { createTransfer, createPayout, verifyWebhookSignature, savePaymentSource } from './swiftech.js';
 import { encryptPaymentData, decryptPaymentData } from './encryption.js';
+import crypto from 'crypto';
 
 initializeApp();
 const db = getFirestore();
@@ -38,6 +39,25 @@ async function getSenderDoc(sender_uid) {
   const snap = await ref.get();
   if (!snap.exists) throw new HttpsError('not-found', 'Sender user not found');
   return { ref, data: snap.data() };
+}
+
+/**
+ * Card/bank funding is not wired to a payment processor yet, so crediting a wallet from
+ * an external source creates money out of nothing. Only allow it on projects that opt in
+ * with MONET_SIMULATION=true (dev/test); fail closed everywhere else.
+ */
+function assertSimulationAllowed() {
+  if (process.env.MONET_SIMULATION !== 'true') {
+    throw new HttpsError('failed-precondition', 'Card and bank funding are not available yet');
+  }
+}
+
+function parseAmount(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new HttpsError('invalid-argument', 'A positive amount is required');
+  }
+  return Math.round(amount * 100) / 100;
 }
 
 // ---------- Kiosk Helpers ----------
@@ -67,7 +87,7 @@ function calculateKioskFees(amount) {
  * Generate a 6-digit withdrawal code for kiosk transactions.
  */
 function generateWithdrawalCode() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return crypto.randomInt(100000, 1000000).toString();
 }
 
 /**
@@ -78,6 +98,9 @@ async function validateMcpBalance(mcp_uid) {
   const snap = await ref.get();
   if (!snap.exists) throw new HttpsError('not-found', 'MCP user not found');
   const data = snap.data();
+  if (String(data.role || '').toLowerCase() !== 'mcp') {
+    throw new HttpsError('failed-precondition', 'Selected user is not a kiosk partner');
+  }
   const balance = Number(data.wallet_balance || 0);
   
   // SIMULATION MODE: Bypassing the $250 minimum requirement for testing
@@ -157,10 +180,9 @@ export const initiateTransfer = onCall(
     if (!request.auth) throw new HttpsError('unauthenticated', 'Must be signed in');
     const sender_uid = request.auth.uid;
     const { receiver_uid, amount_usd, funding_source } = request.data || {};
-    if (!receiver_uid || amount_usd == null || amount_usd <= 0) {
-      throw new HttpsError('invalid-argument', 'receiver_uid and positive amount_usd required');
-    }
-    const amount = Number(amount_usd);
+    if (!receiver_uid) throw new HttpsError('invalid-argument', 'receiver_uid required');
+    if (receiver_uid === sender_uid) throw new HttpsError('invalid-argument', 'Cannot send money to yourself');
+    const amount = parseAmount(amount_usd);
     const source = funding_source === 'wallet' ? 'wallet' : 'card'; // card | bank → external
 
     const { ref: receiverRef, data: receiver } = await getReceiverDoc(receiver_uid);
@@ -168,13 +190,14 @@ export const initiateTransfer = onCall(
     if (!wallet_id) throw new HttpsError('failed-precondition', 'Receiver has no wallet_id');
 
     if (source === 'wallet') {
-      const { ref: senderRef, data: sender } = await getSenderDoc(sender_uid);
-      const balance = Number(sender.wallet_balance || 0);
-      if (balance < amount) {
-        throw new HttpsError('failed-precondition', 'Insufficient wallet balance');
-      }
+      const { ref: senderRef } = await getSenderDoc(sender_uid);
       const ref = `wallet_${sender_uid}_${Date.now()}`;
       await db.runTransaction(async (tx) => {
+        // Check the balance inside the transaction so two concurrent sends can't both pass.
+        const senderSnap = await tx.get(senderRef);
+        if (Number(senderSnap.data()?.wallet_balance || 0) < amount) {
+          throw new HttpsError('failed-precondition', 'Insufficient wallet balance');
+        }
         tx.update(senderRef, {
           wallet_balance: FieldValue.increment(-amount),
           updated_at: FieldValue.serverTimestamp(),
@@ -208,6 +231,7 @@ export const initiateTransfer = onCall(
     }
 
     // SIMULATION MODE: Bypass Swiftech and immediately complete the external transfer
+    assertSimulationAllowed();
     const { ref: senderRef } = await getSenderDoc(sender_uid);
     const ref = `sim_ext_${sender_uid}_${Date.now()}`;
     await db.runTransaction(async (tx) => {
@@ -253,48 +277,61 @@ export const initiatePayout = onCall(
     if (!request.auth) throw new HttpsError('unauthenticated', 'Must be signed in');
     const user_uid = request.auth.uid;
     const { amount_usd, provider } = request.data || {};
-    if (amount_usd == null || amount_usd <= 0 || !provider) {
-      throw new HttpsError('invalid-argument', 'amount_usd and provider (mpesa|airtel|orange) required');
+    if (!['mpesa', 'airtel', 'orange'].includes(provider)) {
+      throw new HttpsError('invalid-argument', 'provider must be mpesa, airtel or orange');
     }
+    const amount = parseAmount(amount_usd);
 
     const { ref: userRef, data: user } = await getSenderDoc(user_uid);
     const wallet_id = user.wallet_id;
-    const balance = Number(user.wallet_balance || 0);
     if (!wallet_id) throw new HttpsError('failed-precondition', 'User has no wallet_id');
-    if (balance < amount_usd) throw new HttpsError('failed-precondition', 'Insufficient balance');
 
-    const result = await createPayout({
-      user_uid,
-      wallet_id,
-      amount_usd: Number(amount_usd),
-      phone: user.phone,
-      provider,
-    });
-
-    if (!result.success) {
-      throw new HttpsError('internal', result.error || 'Payout failed');
-    }
-
-    // Optimistically deduct balance and log withdrawal; webhook can reconcile if needed
+    // Reserve the funds first (balance checked inside the transaction), then call the
+    // provider. If the payout fails, the reservation is refunded. This prevents two
+    // concurrent withdrawals from spending the same balance.
     const txRef = userRef.collection('transactions').doc();
     await db.runTransaction(async (tx) => {
+      const snap = await tx.get(userRef);
+      if (Number(snap.data()?.wallet_balance || 0) < amount) {
+        throw new HttpsError('failed-precondition', 'Insufficient balance');
+      }
       tx.update(userRef, {
-        wallet_balance: FieldValue.increment(-amount_usd),
+        wallet_balance: FieldValue.increment(-amount),
         updated_at: FieldValue.serverTimestamp(),
       });
       tx.set(txRef, {
         sender_id: '',
         receiver_id: user_uid,
-        amount: amount_usd,
-        status: 'completed',
+        amount,
+        status: 'pending',
         type: 'withdrawal',
-        gateway_ref: result.reference || result.gateway_ref || '',
+        gateway_ref: '',
         timestamp: FieldValue.serverTimestamp(),
         metadata: { provider },
       });
     });
 
-      await logActivity({ actor_uid: user_uid, action: 'initiate_payout', metadata: { amount_usd, provider, reference: result.reference } });
+    let result;
+    try {
+      result = await createPayout({ user_uid, wallet_id, amount_usd: amount, phone: user.phone, provider });
+    } catch (err) {
+      result = { success: false, error: err.message };
+    }
+
+    if (!result.success) {
+      await db.runTransaction(async (tx) => {
+        tx.update(userRef, {
+          wallet_balance: FieldValue.increment(amount),
+          updated_at: FieldValue.serverTimestamp(),
+        });
+        tx.update(txRef, { status: 'failed', metadata: { provider, error: result.error || 'Payout failed' } });
+      });
+      throw new HttpsError('internal', result.error || 'Payout failed');
+    }
+
+    await txRef.update({ status: 'completed', gateway_ref: result.reference || result.gateway_ref || '' });
+
+      await logActivity({ actor_uid: user_uid, action: 'initiate_payout', metadata: { amount_usd: amount, provider, reference: result.reference } });
       return { success: true, reference: result.reference, transaction_id: txRef.id };
   }
 );
@@ -439,10 +476,8 @@ export const addMoneyToWallet = onCall(
     if (!request.auth) throw new HttpsError('unauthenticated', 'Must be signed in');
     const user_uid = request.auth.uid;
     const { amount_usd, source } = request.data || {};
-    if (amount_usd == null || amount_usd <= 0) {
-      throw new HttpsError('invalid-argument', 'Positive amount_usd required');
-    }
-    const amount = Number(amount_usd);
+    assertSimulationAllowed();
+    const amount = parseAmount(amount_usd);
     const fundingSource = ['bank', 'card', 'debit'].includes(source) ? source : 'card';
 
     const { ref: userRef } = await getSenderDoc(user_uid);
@@ -522,9 +557,13 @@ export const adminEditUser = onCall({ enforceAppCheck: false }, async (request) 
   const adminUid = await ensureAdmin(request);
   const { uid, updates } = request.data || {};
   if (!uid || !updates || typeof updates !== 'object') throw new HttpsError('invalid-argument', 'uid and updates required');
-  // Prevent password changes here
-  delete updates.password;
-  delete updates.passwordHash;
+  // Only profile and access fields. Balances change through the ledger, never by direct edit.
+  const allowed = ['name', 'phone', 'email', 'role', 'force_logout', 'mcp_id'];
+  const rejected = Object.keys(updates).filter((k) => !allowed.includes(k));
+  if (rejected.length) throw new HttpsError('invalid-argument', `Fields not editable: ${rejected.join(', ')}`);
+  if ('role' in updates && !['user', 'admin', 'mcp'].includes(String(updates.role).toLowerCase())) {
+    throw new HttpsError('invalid-argument', 'role must be user, admin or mcp');
+  }
   try {
     const userRef = db.collection('users').doc(uid);
     updates.updated_at = FieldValue.serverTimestamp();
@@ -660,12 +699,9 @@ export const initiateKioskCashOut = onCall({ enforceAppCheck: false }, async (re
   if (!request.auth) throw new HttpsError('unauthenticated', 'Must be signed in');
   const user_uid = request.auth.uid;
   const { amount_usd, mcp_uid } = request.data || {};
-  
-  if (amount_usd == null || amount_usd <= 0 || !mcp_uid) {
-    throw new HttpsError('invalid-argument', 'amount_usd and mcp_uid required');
-  }
 
-  const amount = Number(amount_usd);
+  if (!mcp_uid) throw new HttpsError('invalid-argument', 'mcp_uid required');
+  const amount = parseAmount(amount_usd);
   
   // Validate user has sufficient balance
   const { ref: userRef, data: user } = await getSenderDoc(user_uid);
@@ -753,6 +789,13 @@ export const confirmKioskCashOut = onCall({ enforceAppCheck: false }, async (req
 
   try {
     await db.runTransaction(async (tx) => {
+      // Re-check the code inside the transaction so it can only be redeemed once,
+      // even if the agent submits it twice at the same moment.
+      const freshKiosk = await tx.get(kioskTxDoc.ref);
+      if (freshKiosk.data()?.status !== 'pending') {
+        throw new HttpsError('failed-precondition', 'Withdrawal code already used');
+      }
+
       // Verify balances haven't changed
       const userSnap = await tx.get(userRef);
       const userBal = Number(userSnap.data()?.wallet_balance || 0);
@@ -835,6 +878,7 @@ export const confirmKioskCashOut = onCall({ enforceAppCheck: false }, async (req
       monet_commission: monetCommission,
     };
   } catch (err) {
+    if (err instanceof HttpsError) throw err;
     throw new HttpsError('internal', err.message || 'Confirmation failed');
   }
 });
@@ -852,7 +896,8 @@ export const swiftechWebhook = onRequest(
     const rawBody = typeof req.rawBody === 'undefined' ? JSON.stringify(req.body) : req.rawBody;
     const signature = req.headers['x-swiftech-signature'] || req.headers['x-webhook-signature'] || '';
 
-    if (process.env.SWIFTECH_WEBHOOK_SECRET && !verifyWebhookSignature(rawBody, signature)) {
+    // Fail closed: without a configured secret anyone could POST here and credit a wallet.
+    if (!process.env.SWIFTECH_WEBHOOK_SECRET || !verifyWebhookSignature(rawBody, signature)) {
       res.status(401).send('Invalid signature');
       return;
     }
@@ -876,8 +921,15 @@ export const swiftechWebhook = onRequest(
         return;
       }
 
-      const txRef = userRef.collection('transactions').doc();
+      // Key the record by the gateway reference so a retried or replayed webhook
+      // can't credit the same transfer twice.
+      const txRef = userRef.collection('transactions').doc(`swiftech_${String(ref).replace(/\//g, '_')}`);
+      let duplicate = false;
       await db.runTransaction(async (tx) => {
+        if ((await tx.get(txRef)).exists) {
+          duplicate = true;
+          return;
+        }
         tx.update(userRef, {
           wallet_balance: FieldValue.increment(amount),
           updated_at: FieldValue.serverTimestamp(),
@@ -893,7 +945,7 @@ export const swiftechWebhook = onRequest(
         });
       });
 
-      res.status(200).json({ ok: true, transaction_id: txRef.id });
+      res.status(200).json({ ok: true, transaction_id: txRef.id, duplicate });
       return;
     }
 
