@@ -71,4 +71,34 @@ describe('users/{uid}', () => {
   it('blocks signed-out reads', async () => {
     await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'users/alice')));
   });
+
+  it("blocks reading another user's private record", async () => {
+    await assertFails(getDoc(doc(as('bob'), 'users/alice')));
+  });
+
+  it('lets a user and admins read the private record', async () => {
+    await assertSucceeds(getDoc(doc(as('alice'), 'users/alice')));
+    await assertSucceeds(getDoc(doc(as('admin1'), 'users/alice')));
+  });
+});
+
+describe('profiles/{uid}', () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'profiles/alice'), { name: 'Alice', has_wallet: true, is_agent: false });
+    });
+  });
+
+  it('is readable by any signed-in user', async () => {
+    await assertSucceeds(getDoc(doc(as('bob'), 'profiles/alice')));
+  });
+
+  it('is not readable when signed out', async () => {
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'profiles/alice')));
+  });
+
+  it('cannot be written by users, even the owner', async () => {
+    await assertFails(updateDoc(doc(as('alice'), 'profiles/alice'), { name: 'Alicia' }));
+    await assertFails(setDoc(doc(as('bob'), 'profiles/bob'), { name: 'Bob', is_agent: true }));
+  });
 });

@@ -7,6 +7,7 @@
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { onRequest } from 'firebase-functions/v2/https';
+import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { getStorage } from 'firebase-admin/storage';
@@ -109,6 +110,33 @@ async function validateMcpBalance(mcp_uid) {
   // }
   return balance;
 }
+
+// ---------- Public profiles ----------
+// users/{uid} holds private data (balance, email, payment details) and is readable only by
+// its owner and admins. profiles/{uid} is the copy other users see when picking a recipient
+// or a kiosk agent, and contains nothing else.
+
+function publicProfileOf(data) {
+  const isAgent = String(data.role || '').toLowerCase() === 'mcp';
+  return {
+    name: data.name || null,
+    phone: data.phone || null,
+    photoURL: data.photoURL || null,
+    is_agent: isAgent,
+    mcp_id: isAgent ? data.mcp_id || null : null,
+    has_wallet: !!data.wallet_id,
+  };
+}
+
+export const syncPublicProfile = onDocumentWritten('users/{uid}', async (event) => {
+  const profileRef = db.collection('profiles').doc(event.params.uid);
+  const after = event.data?.after;
+  if (!after?.exists) {
+    await profileRef.delete();
+    return;
+  }
+  await profileRef.set({ ...publicProfileOf(after.data()), updated_at: FieldValue.serverTimestamp() });
+});
 
 // ---------- Callable: Create wallet user (onboarding) ----------
 
@@ -549,6 +577,26 @@ export const adminDeleteUser = onCall({ enforceAppCheck: false }, async (request
   } catch (err) {
     throw new HttpsError('internal', err.message || 'Delete failed');
   }
+});
+
+// ---------- Callable (Admin): Build profiles/ for users created before the trigger existed ----------
+
+export const adminBackfillProfiles = onCall({ enforceAppCheck: false }, async (request) => {
+  const adminUid = await ensureAdmin(request);
+  const users = await db.collection('users').get();
+  let batch = db.batch();
+  let pending = 0;
+  for (const u of users.docs) {
+    batch.set(db.collection('profiles').doc(u.id), { ...publicProfileOf(u.data()), updated_at: FieldValue.serverTimestamp() });
+    if (++pending === 400) {
+      await batch.commit();
+      batch = db.batch();
+      pending = 0;
+    }
+  }
+  if (pending) await batch.commit();
+  await logActivity({ actor_uid: adminUid, action: 'backfill_profiles', metadata: { count: users.size } });
+  return { success: true, count: users.size };
 });
 
 // ---------- Callable (Admin): Edit user profile fields (except password) ----------

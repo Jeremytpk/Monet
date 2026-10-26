@@ -49,7 +49,7 @@ export default function KioskWithdraw() {
     setLoading(true);
     try {
       const searchStr = mcpIdInput.trim().toUpperCase().replace('MCP', '');
-      const q = query(collection(db, 'users'), where('role', '==', 'mcp'));
+      const q = query(collection(db, 'profiles'), where('is_agent', '==', true));
       const snap = await getDocs(q);
       
       const mcpDoc = snap.docs.find((d) => {

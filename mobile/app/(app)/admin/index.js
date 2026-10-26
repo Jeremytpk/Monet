@@ -1,14 +1,29 @@
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../../lib/useAuth';
 import { useTheme } from '../../../lib/ThemeContext';
+import { adminBackfillProfiles } from '../../../lib/functions';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function AdminHome() {
   const router = useRouter();
   const { profile } = useAuth();
   const { colors } = useTheme();
+  const [syncing, setSyncing] = useState(false);
   if (!profile || String(profile.role || '').toLowerCase() !== 'admin') return null;
+
+  const handleSyncProfiles = async () => {
+    setSyncing(true);
+    try {
+      const { count } = await adminBackfillProfiles();
+      Alert.alert('Profiles synced', `${count} users updated.`);
+    } catch (err) {
+      Alert.alert('Error', err.message || String(err));
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -33,6 +48,11 @@ export default function AdminHome() {
         <TouchableOpacity style={[styles.tile, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => router.push('/(app)/admin/ads')}>
           <Ionicons name="megaphone-outline" size={28} color={colors.accent} />
           <Text style={[styles.tileText, { color: colors.text }]}>Ads</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={[styles.tile, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={handleSyncProfiles} disabled={syncing}>
+          {syncing ? <ActivityIndicator color={colors.accent} /> : <Ionicons name="sync-outline" size={28} color={colors.accent} />}
+          <Text style={[styles.tileText, { color: colors.text }]}>Sync profiles</Text>
         </TouchableOpacity>
       </View>
 

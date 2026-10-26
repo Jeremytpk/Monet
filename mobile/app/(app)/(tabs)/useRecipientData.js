@@ -17,8 +17,8 @@ export function useRecipientData(user, t) {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Fetch all users
-        const usersSnap = await getDocs(collection(db, 'users'));
+        // Fetch public profiles of users who have a wallet
+        const usersSnap = await getDocs(query(collection(db, 'profiles'), where('has_wallet', '==', true)));
         const userList = [];
         usersSnap.forEach((doc) => {
           if (doc.id !== user.uid) {

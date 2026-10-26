@@ -64,6 +64,13 @@ export async function getPaymentMethods() {
 }
 
 // --- Admin callables ---
+export async function adminBackfillProfiles() {
+  await ensureTokenRefreshed();
+  const fn = httpsCallable(functions, 'adminBackfillProfiles');
+  const { data } = await fn({});
+  return data;
+}
+
 export async function adminDeleteUser(uid) {
   await ensureTokenRefreshed();
   const fn = httpsCallable(functions, 'adminDeleteUser');

@@ -78,7 +78,7 @@ export default function SendScreen() {
     setFoundKiosk(null);
     try {
       const searchStr = kioskSearchId.trim().toUpperCase().replace('MCP', '');
-      const q = query(collection(db, 'users'), where('role', '==', 'mcp'));
+      const q = query(collection(db, 'profiles'), where('is_agent', '==', true));
       const snap = await getDocs(q);
 
       const doc = snap.docs.find((d) => {

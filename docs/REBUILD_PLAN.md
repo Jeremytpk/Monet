@@ -26,10 +26,19 @@ Done:
   edited directly.
 - Amounts validated and rounded to cents.
 
+- Privacy: `users/{uid}` is readable only by its owner and admins. Other users read
+  `profiles/{uid}` (name, phone, photo, kiosk agent id), kept in sync by the
+  `syncPublicProfile` trigger. Covered by `tests/functions/profiles.test.js`.
+
+  **Deploy order matters:** (1) deploy functions, (2) in the app's admin dashboard tap
+  "Sync profiles" once to create profiles for existing users, (3) ship the app update,
+  (4) deploy `firestore.rules`. Deploying the rules before the app update breaks recipient
+  search in older app versions.
+
 Remaining:
-- Any signed-in user can read every user doc, including phone, card/bank last4 and
-  encrypted payment blobs. Split into a public `profiles` collection (name, photo, wallet
-  handle) for recipient search, and lock `users` to owner + admin.
+- Profiles still expose every user's phone number to all signed-in users (the Send screen
+  lists everyone). Product decision for the redesign: search by exact phone/handle instead
+  of browsing a directory.
 - Move roles to Firebase Auth custom claims instead of a Firestore field.
 - Store money as integer cents; add a ledger collection so every balance change has an
   entry, and a reconciliation check.
@@ -54,5 +63,6 @@ Real payment processor live, monitoring, EAS builds, store assets with the new l
 
 ## Running tests
 ```bash
-cd tests && npm install && npm run test:rules
+cd functions && npm install    # the functions emulator loads them from here
+cd ../tests && npm install && npm test
 ```
