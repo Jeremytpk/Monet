@@ -34,6 +34,7 @@ export default function AdminHome() {
         <ListItem icon="receipt" title={t.adminTransactions} subtitle={t.adminTransactionsHint} onPress={() => router.push('/(app)/admin/transactions')} />
         <ListItem icon="activity" title={t.globalActivity} subtitle={t.globalActivityHint} onPress={() => router.push('/(app)/admin/activities')} />
         <ListItem icon="megaphone" tone="highlight" title={t.adminAds} subtitle={t.adminAdsSubtitle} onPress={() => router.push('/(app)/admin/ads')} />
+        <ListItem icon="sparkle" tone="highlight" title={t.adMakerTitle} subtitle={t.adMakerHint} onPress={() => router.push('/(app)/admin/ad-maker')} />
       </ListGroup>
 
       <ListGroup title={t.adminMaintenance}>

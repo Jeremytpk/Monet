@@ -5,6 +5,7 @@ import { useTheme } from '../../lib/ThemeContext';
 import { useLanguage } from '../../lib/LanguageContext';
 import { getPaymentMethods, savePaymentMethod } from '../../lib/functions';
 import { AppText, Button, Header, Icon, IconChip, Screen, Sheet, TextField } from '../../components/ui';
+import { Sticker } from '../../components/brand';
 
 // Only last 4 digits and metadata are stored; full card/account numbers are never saved.
 function getLast4(value) {
@@ -192,9 +193,9 @@ export default function PaymentMethodsScreen() {
             />
           </View>
 
-          <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-            <IconChip icon="shield" />
-            <AppText variant="caption" color="muted" style={{ flex: 1 }}>{t.paymentDisclaimer}</AppText>
+          <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center', padding: 14, borderRadius: 20, backgroundColor: colors.accentSoft }}>
+            <Sticker name="safe" size={64} />
+            <AppText variant="caption" style={{ flex: 1, fontSize: 14, lineHeight: 20, color: colors.text }}>{t.paymentDisclaimer}</AppText>
           </View>
         </>
       )}

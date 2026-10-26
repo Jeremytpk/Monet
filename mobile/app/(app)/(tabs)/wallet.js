@@ -22,6 +22,7 @@ import {
   TransactionRow,
 } from '../../../components/ui';
 import { GuestPrompt } from '../../../components/GuestPrompt';
+import { Scene, Sticker } from '../../../components/brand';
 
 export default function WalletScreen() {
   const { user, profile, setProfile } = useAuth();
@@ -104,8 +105,29 @@ export default function WalletScreen() {
     return (
       <Screen>
         {topBar}
+        <GuestPrompt
+          tone="brand"
+          art={<Scene name="bridge" width={320} dark />}
+          title={t.guestWalletTitle}
+          message={t.guestWalletMsg}
+        />
+        <View style={{ gap: 12 }}>
+          <AppText variant="heading" accessibilityRole="header">{t.howItWorks}</AppText>
+          {[
+            { sticker: 'topup', title: t.how1Title, body: t.how1Body },
+            { sticker: 'sent', title: t.how2Title, body: t.how2Body },
+            { sticker: 'cash', title: t.how3Title, body: t.how3Body },
+          ].map((s) => (
+            <View key={s.sticker} style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+              <Sticker name={s.sticker} size={56} />
+              <View style={{ flex: 1, gap: 2 }}>
+                <AppText variant="bodyStrong">{s.title}</AppText>
+                <AppText variant="caption" color="muted" style={{ fontSize: 14, lineHeight: 20 }}>{s.body}</AppText>
+              </View>
+            </View>
+          ))}
+        </View>
         <PromoCarousel items={promos} />
-        <GuestPrompt />
       </Screen>
     );
   }
@@ -179,7 +201,7 @@ export default function WalletScreen() {
               </View>
             );
           }) : (
-            <EmptyState icon="activity" title={t.noTransactions} message={t.noTransactionsHint} />
+            <EmptyState art={<Sticker name="mbote" size={88} />} title={t.walletEmptyTitle} message={t.walletEmptyMsg} actionLabel={t.tabSend} onAction={() => router.push('/(app)/(tabs)/send')} />
           )}
         </Card>
       </View>

@@ -10,6 +10,7 @@ import { formatMoney } from '../../../lib/format';
 import { describeTransaction, formatTxDate } from '../../../lib/transactions';
 import { AppText, Button, Card, DetailRow, EmptyState, Header, Screen, Sheet, StatusBadge, TransactionRow } from '../../../components/ui';
 import { AdminSearch } from '../../../components/AdminSearch';
+import { Character } from '../../../components/brand';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const short = (id) => (id ? `${String(id).slice(0, 8)}…` : '');
@@ -123,7 +124,7 @@ export default function AdminTransactions() {
             </View>
           );
         }) : (
-          <EmptyState icon="receipt" title={t.noTransactions} />
+          <EmptyState art={<Character name="mama" size={110} />} title={t.noTransactions} />
         )}
       </Card>
 

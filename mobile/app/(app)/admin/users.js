@@ -10,6 +10,7 @@ import { adminDeleteUser, adminEditUser } from '../../../lib/functions';
 import { roleLabel } from '../../../lib/admin';
 import { AppText, Avatar, Card, EmptyState, Header, IconButton, ListGroup, ListItem, Screen, Sheet, StatusBadge } from '../../../components/ui';
 import { AdminSearch } from '../../../components/AdminSearch';
+import { Character } from '../../../components/brand';
 
 const ROLES = [
   { value: 'admin', icon: 'shield' },
@@ -105,7 +106,7 @@ export default function AdminUsers() {
             </Pressable>
           </View>
         )) : (
-          <EmptyState icon="users" title={t.noUsersFound} />
+          <EmptyState art={<Character name="grace" size={110} />} title={t.noUsersFound} />
         )}
       </Card>
 

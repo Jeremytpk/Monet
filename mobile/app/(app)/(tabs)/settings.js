@@ -10,6 +10,7 @@ import { useLanguage } from '../../../lib/LanguageContext';
 import { getPaymentMethods } from '../../../lib/functions';
 import { AppText, Avatar, Icon, ListGroup, ListItem, LogoMark, Screen } from '../../../components/ui';
 import { GuestPrompt } from '../../../components/GuestPrompt';
+import { Character } from '../../../components/brand';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -42,7 +43,7 @@ export default function SettingsScreen() {
       <AppText variant="title" accessibilityRole="header">{t.settings}</AppText>
 
       {!user ? (
-        <GuestPrompt />
+        <GuestPrompt tone="cream" art={<Character name="grace" size={170} />} title={t.guestSettingsTitle} message={t.guestSettingsMsg} />
       ) : (
         <Pressable
           accessibilityRole="button"

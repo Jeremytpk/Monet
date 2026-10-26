@@ -2,6 +2,8 @@ import { Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useLanguage } from '../../lib/LanguageContext';
 import { Header, ListGroup, ListItem, Screen, StatusBadge } from '../../components/ui';
+import { IllustratedBanner } from '../../components/IllustratedBanner';
+import { Character } from '../../components/brand';
 
 export default function MobileMoneyServicesScreen() {
   const { t } = useLanguage();
@@ -9,7 +11,8 @@ export default function MobileMoneyServicesScreen() {
 
   return (
     <Screen edges={['top', 'bottom']}>
-      <Header title={t.servicesTitle} subtitle={t.servicesSubtitle} />
+      <Header />
+      <IllustratedBanner tone="cream" title={t.servicesTitle} body={t.servicesBanner} art={<Character name="grace" size={120} />} />
       <ListGroup>
         <ListItem
           icon="phone"

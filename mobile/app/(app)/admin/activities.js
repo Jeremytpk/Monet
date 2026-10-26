@@ -11,6 +11,7 @@ import { formatMoney } from '../../../lib/format';
 import { describeTransaction } from '../../../lib/transactions';
 import { AppText, Card, DetailRow, EmptyState, Header, Screen, Segmented, Sheet, StatusBadge, TransactionRow } from '../../../components/ui';
 import { AdminSearch } from '../../../components/AdminSearch';
+import { Sticker } from '../../../components/brand';
 
 const CACHE_KEY = 'admin_activities_cache';
 const FILTERS = {
@@ -132,7 +133,7 @@ export default function AdminActivitiesScreen() {
               </View>
             );
           }) : (
-            <EmptyState icon="activity" title={t.no_recent_activity} />
+            <EmptyState art={<Sticker name="mbote" size={88} />} title={t.no_recent_activity} />
           )}
         </Card>
       )}

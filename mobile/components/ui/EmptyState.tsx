@@ -5,17 +5,19 @@ import { IconChip } from './ListItem';
 import type { IconName } from './Icon';
 
 type Props = {
-  icon: IconName;
+  icon?: IconName;
+  /** A character or sticker; takes the place of the icon. */
+  art?: React.ReactNode;
   title: string;
   message?: string;
   actionLabel?: string;
   onAction?: () => void;
 };
 
-export function EmptyState({ icon, title, message, actionLabel, onAction }: Props) {
+export function EmptyState({ icon = 'info', art, title, message, actionLabel, onAction }: Props) {
   return (
-    <View style={{ alignItems: 'center', paddingVertical: 32, paddingHorizontal: 16, gap: 12 }}>
-      <IconChip icon={icon} size={56} />
+    <View style={{ alignItems: 'center', paddingVertical: 28, paddingHorizontal: 16, gap: 12 }}>
+      {art ? <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">{art}</View> : <IconChip icon={icon} size={56} />}
       <AppText variant="heading" style={{ textAlign: 'center' }}>
         {title}
       </AppText>

@@ -25,6 +25,7 @@ import {
   TransactionRow,
 } from '../../../components/ui';
 import { GuestPrompt } from '../../../components/GuestPrompt';
+import { Character } from '../../../components/brand';
 
 export default function ActivityScreen() {
   const { user } = useAuth();
@@ -129,7 +130,7 @@ export default function ActivityScreen() {
     return (
       <Screen>
         <AppText variant="title" accessibilityRole="header">{t.tabActivity}</AppText>
-        <GuestPrompt />
+        <GuestPrompt tone="mint" art={<Character name="mama" size={170} />} title={t.guestActivityTitle} message={t.guestActivityMsg} />
       </Screen>
     );
   }
@@ -186,7 +187,7 @@ export default function ActivityScreen() {
               <TransactionRow {...d} onPress={() => askPassword('details', tx)} />
             </View>
           )) : (
-            <EmptyState icon="receipt" title={t.noTransactions} message={t.noTransactionsHint} />
+            <EmptyState art={<Character name="mama" size={130} />} title={t.activityEmptyTitle} message={t.activityEmptyMsg} />
           )}
         </Card>
       )}
@@ -207,6 +208,7 @@ export default function ActivityScreen() {
       </Sheet>
 
       <Sheet visible={codeVisible} onClose={() => setCodeVisible(false)} title={t.activeWithdrawalCode}>
+        <View style={{ alignItems: 'center' }}><Character name="kiosk" size={120} /></View>
         <AppText variant="body" color="muted">{t.showCodeToAgent}</AppText>
         <CodeDisplay code={pendingKiosk?.code} />
         {pendingKiosk ? (

@@ -6,6 +6,8 @@ import { useLanguage } from '../../lib/LanguageContext';
 import { initiatePayout } from '../../lib/functions';
 import { formatMoney } from '../../lib/format';
 import { AmountInput, AppText, Button, Card, Header, Screen, Segmented } from '../../components/ui';
+import { IllustratedBanner } from '../../components/IllustratedBanner';
+import { Sticker } from '../../components/brand';
 
 const PROVIDERS = [
   { value: 'mpesa', label: 'M-Pesa', icon: 'phone' },
@@ -45,7 +47,8 @@ export default function WithdrawScreen() {
       edges={['top', 'bottom']}
       footer={<Button title={num > 0 ? `${t.withdraw} ${formatMoney(num)}` : t.withdraw} onPress={handleWithdraw} loading={loading} disabled={!(num > 0) || !provider} />}
     >
-      <Header title={t.transferToMobileMoney} subtitle={t.withdrawSubtitle} />
+      <Header />
+      <IllustratedBanner tone="mint" title={t.transferToMobileMoney} body={t.withdrawSubtitle} art={<Sticker name="topup" size={96} />} />
 
       <Card>
         <AmountInput

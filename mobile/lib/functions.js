@@ -113,6 +113,14 @@ export async function adminDeleteAd(id) {
   return data;
 }
 
+/** AI ad copy: returns { variants: [{ headline, subline, cta, tone, layout, sticker, alt_text }] }. */
+export async function adminGenerateAd({ brief, headline, cta, language, format, visual }) {
+  await ensureTokenRefreshed();
+  const fn = httpsCallable(functions, 'adminGenerateAd', { timeout: 120000 });
+  const { data } = await fn({ brief, headline, cta, language, format, visual });
+  return data;
+}
+
 export async function adminUploadAdImage(imageBase64, contentType) {
   await ensureTokenRefreshed();
   const fn = httpsCallable(functions, 'adminUploadAdImage');

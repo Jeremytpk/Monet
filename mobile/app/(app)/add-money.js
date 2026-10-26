@@ -5,8 +5,9 @@ import { useAuth } from '../../lib/useAuth';
 import { useLanguage } from '../../lib/LanguageContext';
 import { addMoneyToWallet } from '../../lib/functions';
 import { formatMoney } from '../../lib/format';
-import { AmountInput, AppText, Card, Header, Screen, Segmented } from '../../components/ui';
-import { Button } from '../../components/ui';
+import { AmountInput, AppText, Button, Card, Header, Screen, Segmented } from '../../components/ui';
+import { IllustratedBanner } from '../../components/IllustratedBanner';
+import { Character } from '../../components/brand';
 
 export default function AddMoneyScreen() {
   const router = useRouter();
@@ -41,7 +42,8 @@ export default function AddMoneyScreen() {
       edges={['top', 'bottom']}
       footer={<Button title={num > 0 ? `${t.addMoney} ${formatMoney(num)}` : t.addMoney} onPress={handleAdd} loading={loading} disabled={!(num > 0)} />}
     >
-      <Header back="close" title={t.addMoneyTitle} subtitle={t.addMoneySubtitleScreen} />
+      <Header back="close" />
+      <IllustratedBanner tone="copper" title={t.addMoneyTitle} body={t.addMoneySubtitleScreen} art={<Character name="jean" size={120} />} />
 
       <Card>
         <AmountInput

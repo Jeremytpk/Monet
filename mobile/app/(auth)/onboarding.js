@@ -6,11 +6,14 @@ import { createWalletUser } from '../../lib/functions';
 import { auth, db } from '../../lib/firebase';
 import { useAuth } from '../../lib/useAuth';
 import { useLanguage } from '../../lib/LanguageContext';
-import { AppText, Button, IconChip, LogoMark, Screen, TextField } from '../../components/ui';
+import { useTheme } from '../../lib/ThemeContext';
+import { AppText, Button, Screen, TextField } from '../../components/ui';
+import { Scene, Sticker } from '../../components/brand';
 
 export default function OnboardingScreen() {
   const router = useRouter();
   const { setProfile } = useAuth();
+  const { colors } = useTheme();
   const { t } = useLanguage();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -49,7 +52,9 @@ export default function OnboardingScreen() {
   return (
     <Screen edges={['top', 'bottom']} contentStyle={{ paddingTop: 32 }} footer={<Button title={t.continue} onPress={handleSubmit} loading={loading} />}>
       <View style={{ gap: 16 }}>
-        <LogoMark size={48} />
+        <View style={{ alignItems: 'center', borderRadius: 24, backgroundColor: colors.accentSoft, paddingTop: 16, overflow: 'hidden' }}>
+          <Scene name="bridge" width={300} />
+        </View>
         <AppText variant="display" accessibilityRole="header">{t.createWallet}</AppText>
         <AppText variant="body" color="muted">{t.createWalletSubtitle}</AppText>
       </View>
@@ -82,7 +87,7 @@ export default function OnboardingScreen() {
       </View>
 
       <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-        <IconChip icon="shield" />
+        <Sticker name="safe" size={52} />
         <AppText variant="caption" color="muted" style={{ flex: 1 }}>{t.onboardingPrivacy}</AppText>
       </View>
     </Screen>

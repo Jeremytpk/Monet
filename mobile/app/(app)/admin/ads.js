@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Alert, Image, Pressable, Switch, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
+import { Sticker } from '../../../components/brand';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { useTheme } from '../../../lib/ThemeContext';
 import { useAuth } from '../../../lib/useAuth';
@@ -13,6 +15,7 @@ export default function AdminAds() {
   const { colors, radii } = useTheme();
   const { profile } = useAuth();
   const { t } = useLanguage();
+  const router = useRouter();
   const [ads, setAds] = useState([]);
   const [composerVisible, setComposerVisible] = useState(false);
   const [title, setTitle] = useState('');
@@ -89,7 +92,10 @@ export default function AdminAds() {
 
   return (
     <Screen edges={['top', 'bottom']} footer={
-      <Button title={t.newAd} icon={<Icon name="plus" size={18} color={colors.accentText} />} onPress={() => setComposerVisible(true)} />
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        <Button title={t.newAd} variant="secondary" icon={<Icon name="plus" size={18} color={colors.accent} />} onPress={() => setComposerVisible(true)} style={{ flex: 1 }} />
+        <Button title={t.adCreateWithAi} icon={<Icon name="sparkle" size={18} color={colors.accentText} />} onPress={() => router.push('/(app)/admin/ad-maker')} style={{ flex: 1 }} />
+      </View>
     }>
       <Header title={t.adminAds} subtitle={t.adminAdsSubtitle} />
 
@@ -121,7 +127,7 @@ export default function AdminAds() {
           </View>
         </Card>
       )) : (
-        <Card><EmptyState icon="megaphone" title={t.noAds} message={t.noAdsHint} /></Card>
+        <Card><EmptyState art={<Sticker name="bravo" size={88} />} title={t.noAds} message={t.noAdsHint} /></Card>
       )}
 
       <Sheet visible={composerVisible} onClose={() => setComposerVisible(false)} title={t.newAd}>

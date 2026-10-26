@@ -1,6 +1,6 @@
 import { Image, View } from 'react-native';
 import { useTheme } from '../../lib/ThemeContext';
-import { AppText } from './AppText';
+import { BrandAvatar, avatarIndexFor } from '../brand';
 
 type Props = {
   name?: string | null;
@@ -10,25 +10,18 @@ type Props = {
   selected?: boolean;
 };
 
-function initials(name?: string | null) {
-  const parts = (name || '').trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return '?';
-  return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
-}
-
+/** A user's photo, or their Monet character avatar (same one on every device). */
 export function Avatar({ name, uri, size = 44, selected = false }: Props) {
   const { colors } = useTheme();
-  const ring = selected ? { borderWidth: 2.5, borderColor: colors.accent } : null;
+  const ring = selected ? { borderWidth: 2.5, borderColor: colors.accent, borderRadius: size / 2 } : null;
   return (
-    <View
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      style={[{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, ring]}
-    >
+    <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={ring}>
       {uri ? (
-        <Image source={{ uri }} style={{ width: '100%', height: '100%' }} />
+        <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', backgroundColor: colors.accentSoft }}>
+          <Image source={{ uri }} style={{ width: '100%', height: '100%' }} />
+        </View>
       ) : (
-        <AppText style={{ fontFamily: 'Sora_600SemiBold', fontSize: size * 0.36, color: colors.accentSoftText }}>{initials(name)}</AppText>
+        <BrandAvatar index={avatarIndexFor(name)} size={size} />
       )}
     </View>
   );

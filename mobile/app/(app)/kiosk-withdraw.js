@@ -20,6 +20,8 @@ import {
   Sheet,
   TextField,
 } from '../../components/ui';
+import { IllustratedBanner } from '../../components/IllustratedBanner';
+import { Character, Sticker } from '../../components/brand';
 
 const FEE_RATE = 0.10; // preview only; the server computes the real split
 
@@ -106,7 +108,8 @@ export default function KioskWithdraw() {
 
   return (
     <Screen edges={['top', 'bottom']} footer={<Button title={t.verifyKiosk} onPress={handleVerifyMcp} loading={loading && !mcpToConfirm} />}>
-      <Header back="close" title={t.cashWithdrawal} subtitle={t.withdrawCashSubtitle} />
+      <Header back="close" />
+      <IllustratedBanner tone="copper" title={t.cashWithdrawal} body={t.withdrawCashSubtitle} art={<Character name="kiosk" size={120} />} />
 
       <Card>
         <AmountInput
@@ -150,6 +153,7 @@ export default function KioskWithdraw() {
       <Sheet visible={!!mcpToConfirm} onClose={closeSheet} title={withdrawalCode ? t.activeWithdrawalCode : t.verifyKiosk}>
         {withdrawalCode ? (
           <>
+            <View style={{ alignItems: 'center' }}><Sticker name="cash" size={88} /></View>
             <AppText variant="body" color="muted">{t.showCodeToAgent}</AppText>
             <CodeDisplay code={withdrawalCode} />
             <View style={{ gap: 8 }}>

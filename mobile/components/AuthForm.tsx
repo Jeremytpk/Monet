@@ -4,11 +4,14 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, type User }
 import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { useLanguage } from '../lib/LanguageContext';
+import { useTheme } from '../lib/ThemeContext';
 import { AppText, Button, Logo, Segmented, TextField } from './ui';
+import { Scene } from './brand';
 
 type Props = {
   onSignedUp: (user: User) => void;
   onSignedIn: (user: User) => void;
+  initialMode?: 'signin' | 'signup';
 };
 
 /** Friendlier messages for the Firebase errors people actually hit. */
@@ -27,9 +30,10 @@ function authMessage(code: string | undefined, t: Record<string, string>, fallba
 }
 
 /** Email/password sign-in and sign-up, shared by the auth screen and the login modal. */
-export function AuthForm({ onSignedUp, onSignedIn }: Props) {
+export function AuthForm({ onSignedUp, onSignedIn, initialMode = 'signin' }: Props) {
   const { t } = useLanguage();
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const { colors } = useTheme();
+  const [mode, setMode] = useState<'signin' | 'signup'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -68,9 +72,12 @@ export function AuthForm({ onSignedUp, onSignedIn }: Props) {
 
   return (
     <View style={{ gap: 24 }}>
-      <View style={{ alignItems: 'center', gap: 14, paddingTop: 8 }}>
-        <Logo size={44} />
-        <AppText variant="body" color="muted" style={{ textAlign: 'center' }}>{t.authTagline}</AppText>
+      <View style={{ alignItems: 'center', gap: 14 }}>
+        <View style={{ alignSelf: 'stretch', alignItems: 'center', borderRadius: 24, backgroundColor: colors.accentSoft, paddingTop: 14, overflow: 'hidden' }}>
+          <Scene name="bridge" width={280} />
+        </View>
+        <Logo size={36} />
+        <AppText variant="body" color="muted" style={{ textAlign: 'center' }}>{isSignUp ? t.authTaglineSignup : t.authTagline}</AppText>
       </View>
 
       <Segmented

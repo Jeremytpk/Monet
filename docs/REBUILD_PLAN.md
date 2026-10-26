@@ -88,3 +88,12 @@ Real payment processor live, monitoring, EAS builds, store assets with the new l
 cd functions && npm install    # the functions emulator loads them from here
 cd ../tests && npm install && npm test
 ```
+
+## Phase 4b — Friendly illustrated UI + AI ad maker
+- `mobile/components/brand`: the Monet family characters, 12 avatars, 12 stickers, 3 scenes
+  (same artwork as the brand board). Users without a photo get a stable character avatar.
+- Every guest prompt and empty state uses the character that matches the screen.
+- Admin › AI ad maker: pick a visual, write a brief, Claude (`adminGenerateAd`, Opus 5.5,
+  structured output, server-side refusal fallback) returns 3 on-brand variants; the poster is
+  drawn from brand assets, exported as PNG (share) or published as an in-app ad.
+  Needs `ANTHROPIC_API_KEY` in `functions/.env`. Not yet exercised against the live API.

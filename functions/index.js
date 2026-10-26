@@ -15,6 +15,7 @@ import { initializeApp } from 'firebase-admin/app';
 import { createTransfer, createPayout, verifyWebhookSignature, savePaymentSource } from './swiftech.js';
 import { encryptPaymentData, decryptPaymentData } from './encryption.js';
 import crypto from 'crypto';
+import Anthropic from '@anthropic-ai/sdk';
 
 initializeApp();
 const db = getFirestore();
@@ -714,6 +715,98 @@ export const adminDeleteAd = onCall({ enforceAppCheck: false }, async (request) 
   } catch (err) {
     throw new HttpsError('internal', err.message || 'Delete ad failed');
   }
+});
+
+// ---------- Callable (Admin): AI ad copy for the poster maker ----------
+// The app renders the poster from brand assets; Claude writes the words and picks the
+// tone/layout so every ad stays on-brand. Needs ANTHROPIC_API_KEY in the functions env.
+
+const AD_TONES = ['malachite', 'copper', 'ink', 'mint', 'paper'];
+const AD_LAYOUTS = ['hero', 'split', 'centered'];
+const AD_STICKERS = ['none', 'sent', 'arrived', 'merci', 'family', 'cash', 'safe', 'fast', 'bravo', 'kiosk', 'topup', 'home', 'mbote'];
+
+const AD_SYSTEM_PROMPT = `You write ad copy for Monet, a mobile wallet that lets the African diaspora (US, Europe) send money to family in the Democratic Republic of Congo. Receivers cash out to M-Pesa, Airtel Money, Orange Money or at a Monet kiosk agent.
+
+Brand voice: trusted, close, quick. Warm and familiar like family, plain words, short sentences. Name concrete things ("Mama", "school fees", "your kiosk") rather than abstractions. Lingala greetings like "Mbote" are welcome in moderation.
+
+Facts you may use: sending between Monet wallets is free; kiosk cash-out costs 10% of the amount; codes for kiosk cash-out are 6 digits. Do not invent any other number, rate, speed guarantee, promotion, partner or award. If the brief asks for a claim you cannot support, write around it.
+
+Write in the requested language only. Headline: at most 6 words. Subline: at most 18 words. CTA: at most 3 words, an action. Each of the 3 variants should take a clearly different angle. Pick the tone, layout and sticker that best suit each variant and the chosen visual. alt_text describes the finished poster for screen readers in one sentence.`;
+
+const AD_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['variants'],
+  properties: {
+    variants: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['headline', 'subline', 'cta', 'tone', 'layout', 'sticker', 'alt_text'],
+        properties: {
+          headline: { type: 'string' },
+          subline: { type: 'string' },
+          cta: { type: 'string' },
+          tone: { type: 'string', enum: AD_TONES },
+          layout: { type: 'string', enum: AD_LAYOUTS },
+          sticker: { type: 'string', enum: AD_STICKERS },
+          alt_text: { type: 'string' },
+        },
+      },
+    },
+  },
+};
+
+export const adminGenerateAd = onCall({ enforceAppCheck: false, timeoutSeconds: 120 }, async (request) => {
+  const adminUid = await ensureAdmin(request);
+  const { brief, headline, cta, language = 'en', format = 'portrait', visual } = request.data || {};
+  if (!brief || typeof brief !== 'string' || !brief.trim()) throw new HttpsError('invalid-argument', 'brief required');
+  if (!['en', 'fr'].includes(language)) throw new HttpsError('invalid-argument', 'language must be en or fr');
+  if (!process.env.ANTHROPIC_API_KEY) throw new HttpsError('failed-precondition', 'AI ad maker is not configured');
+
+  const clip = (v, n) => String(v || '').slice(0, n);
+  const userMessage = [
+    `Language: ${language === 'fr' ? 'French' : 'English'}`,
+    `Format: ${format}`,
+    `Visual chosen by the admin: ${clip(visual?.kind, 20)} "${clip(visual?.name, 40)}"`,
+    `Brief: ${clip(brief, 800)}`,
+    headline ? `The admin's headline idea (polish it, keep the meaning): ${clip(headline, 120)}` : null,
+    cta ? `The admin's CTA idea: ${clip(cta, 40)}` : null,
+    'Write 3 poster variants.',
+  ].filter(Boolean).join('\n');
+
+  const client = new Anthropic();
+  let response;
+  try {
+    response = await client.beta.messages.create({
+      model: 'claude-opus-5-5',
+      max_tokens: 16000,
+      betas: ['server-side-fallback-2026-07-01'],
+      fallbacks: 'default',
+      output_config: { effort: 'medium', format: { type: 'json_schema', schema: AD_SCHEMA } },
+      system: AD_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: userMessage }],
+    });
+  } catch (err) {
+    if (err instanceof Anthropic.RateLimitError) throw new HttpsError('resource-exhausted', 'AI is busy, try again in a minute');
+    if (err instanceof Anthropic.APIError) throw new HttpsError('unavailable', `AI request failed (${err.status ?? 'network'})`);
+    throw new HttpsError('internal', err.message || 'AI request failed');
+  }
+
+  if (response.stop_reason === 'refusal') throw new HttpsError('failed-precondition', 'The AI declined this brief. Try rewording it.');
+  const text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new HttpsError('internal', 'AI returned an unexpected answer');
+  }
+  const variants = (parsed.variants || []).slice(0, 3);
+  if (!variants.length) throw new HttpsError('internal', 'AI returned no variants');
+
+  await logActivity({ actor_uid: adminUid, action: 'generate_ad', metadata: { language, format, visual: `${visual?.kind}:${visual?.name}` } });
+  return { success: true, variants };
 });
 
 // ---------- Callable (Admin): Upload ad image (base64 -> Storage) ----------

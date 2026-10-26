@@ -3,8 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test:rules": "firebase emulators:exec --only firestore --project demo-monet \"node --test rules/\"",
-    "test:functions": "firebase emulators:exec --only firestore,functions --project demo-monet \"node --test functions/\"",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-monet \"node --test rules/*.test.js\"",
+    "test:functions": "firebase emulators:exec --only firestore,functions --project demo-monet \"node --test functions/*.test.js\"",
     "test": "npm run test:rules && npm run test:functions"
   },
   "devDependencies": {

@@ -24,6 +24,7 @@ import {
   StatusBadge,
   TransactionRow,
 } from '../../../components/ui';
+import { Character, Sticker } from '../../../components/brand';
 
 export default function McpDashboard() {
   const { colors, radii, isDark } = useTheme();
@@ -121,7 +122,7 @@ export default function McpDashboard() {
       {lastConfirmation ? (
         <Card style={{ gap: 10, borderColor: colors.accent, borderWidth: 1.5 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <IconChip icon="check" size={36} />
+            <Sticker name="cash" size={52} />
             <AppText variant="heading">{t.handOverCash}</AppText>
           </View>
           <AppText variant="amount" color="accent">{formatMoney(Number(lastConfirmation.client_net || 0))}</AppText>
@@ -149,7 +150,7 @@ export default function McpDashboard() {
               </View>
             );
           }) : (
-            <EmptyState icon="receipt" title={t.noTransactionsYet} message={t.agentEmptyHint} />
+            <EmptyState art={<Character name="kiosk" size={130} />} title={t.agentEmptyTitle} message={t.agentEmptyHint} />
           )}
         </Card>
       </View>

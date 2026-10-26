@@ -50,7 +50,8 @@
           "photosPermission": "Allow Monet to access your photos for your profile picture.",
           "cameraPermission": "Allow Monet to use your camera to take a profile photo."
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "updates": {
       "fallbackToCacheTimeout": 0

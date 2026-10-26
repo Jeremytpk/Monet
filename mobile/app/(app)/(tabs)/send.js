@@ -28,6 +28,7 @@ import {
   TextField,
 } from '../../../components/ui';
 import { GuestPrompt } from '../../../components/GuestPrompt';
+import { Character, Sticker } from '../../../components/brand';
 
 const KIOSK_FEE_RATE = 0.10; // display only; the server computes the real split
 
@@ -190,7 +191,7 @@ export default function SendScreen() {
     return (
       <Screen>
         <AppText variant="title" accessibilityRole="header">{t.sendMoney}</AppText>
-        <GuestPrompt />
+        <GuestPrompt tone="copper" art={<Character name="jean" size={170} />} title={t.guestSendTitle} message={t.guestSendMsg} />
       </Screen>
     );
   }
@@ -276,7 +277,10 @@ export default function SendScreen() {
                     </ScrollView>
                   </View>
                 ) : recipients.length === 0 ? (
-                  <AppText variant="body" color="muted">{t.noContacts}</AppText>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, borderRadius: radii.control, backgroundColor: colors.highlightSoft }}>
+                    <Sticker name="family" size={64} />
+                    <AppText variant="body" style={{ flex: 1 }}>{t.noContacts}</AppText>
+                  </View>
                 ) : null}
                 <ListGroup>
                   <ListItem
@@ -331,6 +335,7 @@ export default function SendScreen() {
       <Sheet visible={reviewVisible} onClose={closeReview} title={withdrawalCode ? t.activeWithdrawalCode : isKiosk ? t.confirmKioskSend : t.reviewTitle}>
         {withdrawalCode ? (
           <>
+            <View style={{ alignItems: 'center' }}><Character name="kiosk" size={120} /></View>
             <AppText variant="body" color="muted">{t.showCodeToAgent}</AppText>
             <CodeDisplay code={withdrawalCode} />
             <DetailRow label={t.cashToReceive} value={formatMoney(num - kioskFee)} strong />
@@ -364,7 +369,7 @@ export default function SendScreen() {
       {/* Success */}
       <Sheet visible={successVisible} onClose={() => { setSuccessVisible(false); reset(); }}>
         <View style={{ alignItems: 'center', gap: 12, paddingVertical: 8 }}>
-          <IconChip icon="check" size={64} />
+          <Sticker name="sent" size={110} />
           <AppText variant="title" style={{ textAlign: 'center' }}>{t.sentTitle}</AppText>
           <AppText variant="body" color="muted" style={{ textAlign: 'center' }}>{successMessage}</AppText>
         </View>
