@@ -8,7 +8,7 @@ type Props = Omit<PressableProps, 'children'> & {
   title: string;
   variant?: Variant;
   loading?: boolean;
-  /** Optional icon (e.g. an Ionicons element) shown before the title. */
+  /** Optional icon (e.g. an <Icon />) shown before the title. */
   icon?: React.ReactNode;
 };
 

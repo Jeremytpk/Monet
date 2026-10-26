@@ -68,9 +68,17 @@ TypeScript Cloud Functions, shared types with the app, function tests on the emu
   StatusBadge, TextField, TransactionRow. Money formatting in `lib/format.ts`.
 - Send helpers moved out of `app/` (expo-router treated them as screens).
 
-## Phase 4 — Screens, one flow at a time
-Auth + onboarding → Wallet → Send → Activity → Mobile Money → Kiosk (user + agent) →
-Settings/Profile → Admin.
+## Phase 4 — UI redesign (done, frontend only)
+Every screen rebuilt on the Malachite & Copper kit (`mobile/components/ui`): custom icon set,
+Screen/Header/Sheet/ListGroup/AmountInput/PromoCarousel/Segmented, light + dark.
+- Send now has a review step before money moves; kiosk sends show the fee and code in a sheet.
+- Promo cards never put text over photos; broken ad images fall back to an icon.
+- Bugs fixed on the way: kiosk-withdraw crashed on any alert (`t` undefined); activity's
+  pending-code listener never unsubscribed; agent dashboard recreated listeners every render;
+  admin transactions broke hook order and de-duplicated by id only; admin activity filters
+  matched the wrong types; "regular user" role sent `''` (rejected by the hardened backend).
+- Removed: admin "Simulate add funds" (direct balance edits are now blocked server-side).
+- Not yet verified on device: signed-in screens (needs a test account).
 
 ## Phase 5 — Launch readiness
 Real payment processor live, monitoring, EAS builds, store assets with the new logo.

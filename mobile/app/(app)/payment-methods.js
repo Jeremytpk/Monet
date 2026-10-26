@@ -1,58 +1,74 @@
-import { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
 import { useAuth } from '../../lib/useAuth';
 import { useTheme } from '../../lib/ThemeContext';
 import { useLanguage } from '../../lib/LanguageContext';
 import { getPaymentMethods, savePaymentMethod } from '../../lib/functions';
+import { AppText, Button, Header, Icon, IconChip, Screen, Sheet, TextField } from '../../components/ui';
 
 // Only last 4 digits and metadata are stored; full card/account numbers are never saved.
 function getLast4(value) {
-  const digits = (value || '').replace(/\D/g, '');
-  return digits.slice(-4);
+  return (value || '').replace(/\D/g, '').slice(-4);
+}
+
+/** A saved method drawn as a small card; empty state invites adding one. */
+function MethodTile({ kind, title, detail, onPress, actionLabel }) {
+  const { colors, radii, isDark } = useTheme();
+  const filled = !!detail;
+  const fg = isDark ? colors.background : colors.accentText;
+
+  if (!filled) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        onPress={onPress}
+        style={({ pressed }) => ({
+          minHeight: 120, borderRadius: radii.card - 4, borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.border,
+          backgroundColor: pressed ? colors.accentSoft : colors.card, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 16,
+        })}
+      >
+        <IconChip icon={kind === 'card' ? 'card' : 'bank'} />
+        <AppText variant="bodyStrong">{actionLabel}</AppText>
+      </Pressable>
+    );
+  }
+
+  return (
+    <View style={{ minHeight: 150, borderRadius: radii.card - 4, padding: 20, justifyContent: 'space-between', backgroundColor: kind === 'card' ? colors.accent : colors.text, overflow: 'hidden' }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Icon name={kind === 'card' ? 'card' : 'bank'} size={26} color={kind === 'card' ? fg : colors.background} />
+        <Pressable accessibilityRole="button" onPress={onPress} hitSlop={8} style={{ minHeight: 36, paddingHorizontal: 12, borderRadius: 999, justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.18)' }}>
+          <AppText variant="label" style={{ color: kind === 'card' ? fg : colors.background }}>{actionLabel}</AppText>
+        </Pressable>
+      </View>
+      <View style={{ gap: 4 }}>
+        <AppText style={{ fontFamily: 'Sora_600SemiBold', fontSize: 20, letterSpacing: 2, color: kind === 'card' ? fg : colors.background }}>{detail}</AppText>
+        <AppText variant="caption" style={{ color: kind === 'card' ? fg : colors.background, opacity: 0.8 }}>{title}</AppText>
+      </View>
+    </View>
+  );
 }
 
 export default function PaymentMethodsScreen() {
-  const router = useRouter();
-  const { user, profile, setProfile } = useAuth();
+  const { user, setProfile } = useAuth();
   const { colors } = useTheme();
   const { t } = useLanguage();
-  const styles = createStyles(colors);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeForm, setActiveForm] = useState(null);
+  const [activeForm, setActiveForm] = useState(null); // 'card' | 'bank'
+  const [errors, setErrors] = useState({});
   const [paymentMethods, setPaymentMethods] = useState({ card: null, bank: null });
 
   const [cardNumber, setCardNumber] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardName, setCardName] = useState('');
-
   const [bankHolder, setBankHolder] = useState('');
   const [bankRouting, setBankRouting] = useState('');
   const [bankAccount, setBankAccount] = useState('');
 
   const card = paymentMethods.card;
   const bank = paymentMethods.bank;
-  const cardLast4 = card?.last4;
-  const cardExpMonth = card?.exp_month;
-  const cardExpYear = card?.exp_year;
-  const cardHolderName = card?.holder_name;
-  const bankAccountHolder = bank?.account_holder_name;
-  const bankRoutingNumber = bank?.routing_number;
-  const bankAccountLast4 = bank?.account_last4;
 
   async function loadPaymentMethods() {
     try {
@@ -78,46 +94,25 @@ export default function PaymentMethodsScreen() {
 
   useEffect(() => {
     if (!user?.uid) return;
-    (async () => {
-      await loadPaymentMethods();
-      setLoading(false);
-    })();
+    loadPaymentMethods().finally(() => setLoading(false));
   }, [user?.uid]);
 
-  function formatCardNumber(value) {
-    const v = value.replace(/\D/g, '').slice(0, 16);
-    const parts = v.match(/.{1,4}/g) || [];
-    setCardNumber(parts.join(' '));
-  }
-
-  function formatExpiry(value) {
-    let v = value.replace(/\D/g, '').slice(0, 4);
-    if (v.length >= 2) v = v.slice(0, 2) + '/' + v.slice(2);
-    setCardExpiry(v);
-  }
-
-  function formatRouting(value) {
-    setBankRouting(value.replace(/\D/g, '').slice(0, 9));
-  }
-
-  function formatBankAccount(value) {
-    setBankAccount(value.replace(/\D/g, '').slice(0, 17));
+  function openForm(kind) {
+    setErrors({});
+    setActiveForm(kind);
   }
 
   async function saveCard() {
-    const last4 = getLast4(cardNumber);
-    if (last4.length !== 4) {
-      Alert.alert(t.invalidCard, t.invalidCardMsg);
-      return;
-    }
-    const [month, year] = cardExpiry.split('/').map((s) => s.trim());
+    const next = {};
+    if (getLast4(cardNumber).length !== 4) next.cardNumber = t.invalidCardMsg;
+    const [month, year = ''] = cardExpiry.split('/').map((s) => s.trim());
     const expMonth = parseInt(month, 10);
     const expYear = parseInt(year, 10);
     const fullYear = expYear >= 100 ? expYear : 2000 + expYear;
-    if (!expMonth || expMonth < 1 || expMonth > 12 || !expYear || year.length < 2) {
-      Alert.alert(t.invalidExpiry, t.invalidExpiryMsg);
-      return;
-    }
+    if (!expMonth || expMonth < 1 || expMonth > 12 || !expYear || year.length < 2) next.expiry = t.invalidExpiryMsg;
+    setErrors(next);
+    if (Object.keys(next).length) return;
+
     setSaving(true);
     try {
       await savePaymentMethod('card', {
@@ -132,7 +127,7 @@ export default function PaymentMethodsScreen() {
       setActiveForm(null);
       Alert.alert(t.saved, t.cardSavedMsg);
     } catch (e) {
-      Alert.alert(t.error, e.message || t.errSaveCard);
+      setErrors({ form: e.message || t.errSaveCard });
     } finally {
       setSaving(false);
     }
@@ -140,19 +135,13 @@ export default function PaymentMethodsScreen() {
 
   async function saveBank() {
     const routing = bankRouting.trim().replace(/\D/g, '');
-    const last4 = getLast4(bankAccount);
-    if (routing.length !== 9) {
-      Alert.alert(t.invalidRouting, t.invalidRoutingMsg);
-      return;
-    }
-    if (last4.length !== 4) {
-      Alert.alert(t.invalidAccountNumber, t.invalidAccountMsg);
-      return;
-    }
-    if (!bankHolder.trim()) {
-      Alert.alert(t.required, t.requiredMsg);
-      return;
-    }
+    const next = {};
+    if (!bankHolder.trim()) next.holder = t.requiredMsg;
+    if (routing.length !== 9) next.routing = t.invalidRoutingMsg;
+    if (getLast4(bankAccount).length !== 4) next.account = t.invalidAccountMsg;
+    setErrors(next);
+    if (Object.keys(next).length) return;
+
     setSaving(true);
     try {
       await savePaymentMethod('bank', {
@@ -165,213 +154,111 @@ export default function PaymentMethodsScreen() {
       setActiveForm(null);
       Alert.alert(t.saved, t.bankSavedMsg);
     } catch (e) {
-      Alert.alert(t.error, e.message || t.errSaveBank);
+      setErrors({ form: e.message || t.errSaveBank });
     } finally {
       setSaving(false);
     }
   }
 
-  if (loading) {
-    return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color={colors.accent} />
-      </View>
-    );
-  }
+  const clear = (key) => setErrors((e) => ({ ...e, [key]: null, form: null }));
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <TouchableOpacity style={styles.closeButton} onPress={() => router.back()} hitSlop={12}>
-        <Ionicons name="close" size={28} color={colors.text} />
-      </TouchableOpacity>
+    <Screen edges={['top', 'bottom']}>
+      <Header title={t.paymentMethodsTitle} subtitle={t.paymentMethodsSubtitle} />
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>{t.paymentMethodsTitle}</Text>
-        <Text style={styles.subtitle}>{t.paymentMethodsSubtitle}</Text>
+      {loading ? (
+        <ActivityIndicator color={colors.accent} style={{ marginTop: 40 }} />
+      ) : (
+        <>
+          <View style={{ gap: 10 }}>
+            <AppText variant="heading" accessibilityRole="header">{t.debitOrCreditCardSection}</AppText>
+            <MethodTile
+              kind="card"
+              title={`${card?.holder_name || t.cardShort} · ${t.expires} ${String(card?.exp_month || '').padStart(2, '0')}/${(card?.exp_year || 0) % 100}`}
+              detail={card?.last4 ? `•••• •••• •••• ${card.last4}` : null}
+              actionLabel={card?.last4 ? t.update : t.addCard}
+              onPress={() => openForm('card')}
+            />
+          </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t.debitOrCreditCardSection}</Text>
-          <View style={styles.card}>
-            {cardLast4 ? (
-              <View style={styles.savedRow}>
-                <View style={styles.savedLeft}>
-                  <Ionicons name="card" size={24} color={colors.accent} />
-                  <View>
-                    <Text style={styles.savedLabel}>{cardHolderName || 'Card'}</Text>
-                    <Text style={styles.savedDetail}>•••• {cardLast4} · Exp {String(cardExpMonth).padStart(2, '0')}/{cardExpYear % 100}</Text>
-                  </View>
-                </View>
-                <TouchableOpacity onPress={() => setActiveForm(activeForm === 'card' ? null : 'card')}>
-                  <Text style={[styles.link, { color: colors.accent }]}>{activeForm === 'card' ? t.cancel : t.update}</Text>
-                </TouchableOpacity>
-              </View>
-            ) : null}
-            {(!cardLast4 || activeForm === 'card') && (
-              <View style={styles.form}>
-                <Text style={styles.fieldLabel}>{t.cardNumberLabel}</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="1234 5678 9012 3456"
-                  placeholderTextColor={colors.muted}
-                  value={cardNumber}
-                  onChangeText={formatCardNumber}
-                  keyboardType="number-pad"
-                  maxLength={19}
-                  editable={!saving}
-                />
-                <Text style={styles.fieldLabel}>{t.expiryLabel}</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="12/28"
-                  placeholderTextColor={colors.muted}
-                  value={cardExpiry}
-                  onChangeText={formatExpiry}
-                  keyboardType="number-pad"
-                  maxLength={5}
-                  editable={!saving}
-                />
-                <Text style={styles.fieldLabel}>{t.cardholderName}</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="John Doe"
-                  placeholderTextColor={colors.muted}
-                  value={cardName}
-                  onChangeText={setCardName}
-                  autoCapitalize="words"
-                  editable={!saving}
-                />
-                <TouchableOpacity style={styles.primaryButton} onPress={saveCard} disabled={saving} activeOpacity={0.85}>
-                  {saving ? <ActivityIndicator color={colors.accentText} /> : <Text style={styles.primaryButtonText}>{t.saveCard}</Text>}
-                </TouchableOpacity>
-              </View>
-            )}
-            {cardLast4 && activeForm !== 'card' && (
-              <TouchableOpacity style={styles.addAnother} onPress={() => setActiveForm('card')}>
-                <Ionicons name="add-circle-outline" size={20} color={colors.accent} />
-                <Text style={[styles.addAnotherText, { color: colors.accent }]}>{t.updateCard}</Text>
-              </TouchableOpacity>
-            )}
+          <View style={{ gap: 10 }}>
+            <AppText variant="heading" accessibilityRole="header">{t.bankAccountSection}</AppText>
+            <MethodTile
+              kind="bank"
+              title={`${bank?.account_holder_name || ''} · ${t.routingShort} ${bank?.routing_number || ''}`}
+              detail={bank?.account_last4 ? `•••• ${bank.account_last4}` : null}
+              actionLabel={bank?.account_last4 ? t.update : t.addBank}
+              onPress={() => openForm('bank')}
+            />
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+            <IconChip icon="shield" />
+            <AppText variant="caption" color="muted" style={{ flex: 1 }}>{t.paymentDisclaimer}</AppText>
+          </View>
+        </>
+      )}
+
+      <Sheet visible={activeForm === 'card'} onClose={() => setActiveForm(null)} title={card?.last4 ? t.updateCard : t.addCard}>
+        <TextField
+          label={t.cardNumberLabel}
+          icon="card"
+          placeholder="1234 5678 9012 3456"
+          value={cardNumber}
+          onChangeText={(v) => { setCardNumber((v.replace(/\D/g, '').slice(0, 16).match(/.{1,4}/g) || []).join(' ')); clear('cardNumber'); }}
+          keyboardType="number-pad"
+          maxLength={19}
+          editable={!saving}
+          error={errors.cardNumber}
+        />
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <View style={{ flex: 1 }}>
+            <TextField
+              label={t.expiryLabel}
+              placeholder="12/28"
+              value={cardExpiry}
+              onChangeText={(v) => {
+                let d = v.replace(/\D/g, '').slice(0, 4);
+                if (d.length >= 2) d = d.slice(0, 2) + '/' + d.slice(2);
+                setCardExpiry(d);
+                clear('expiry');
+              }}
+              keyboardType="number-pad"
+              maxLength={5}
+              editable={!saving}
+              error={errors.expiry}
+            />
           </View>
         </View>
+        <TextField label={t.cardholderName} placeholder="Jean Mukendi" value={cardName} onChangeText={setCardName} autoComplete="name" editable={!saving} />
+        {errors.form ? <AppText variant="caption" color="error">{errors.form}</AppText> : null}
+        <Button title={card?.last4 ? t.updateCard : t.saveCard} onPress={saveCard} loading={saving} />
+      </Sheet>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t.bankAccountSection}</Text>
-          <View style={styles.card}>
-            {bankAccountLast4 ? (
-              <View style={styles.savedRow}>
-                <View style={styles.savedLeft}>
-                  <Ionicons name="business" size={24} color={colors.accent} />
-                  <View>
-                    <Text style={styles.savedLabel}>{bankAccountHolder || t.bankAccountSection}</Text>
-                    <Text style={styles.savedDetail}>•••• {bankAccountLast4} · Routing {bankRoutingNumber}</Text>
-                  </View>
-                </View>
-                <TouchableOpacity onPress={() => setActiveForm(activeForm === 'bank' ? null : 'bank')}>
-                  <Text style={[styles.link, { color: colors.accent }]}>{activeForm === 'bank' ? t.cancel : t.update}</Text>
-                </TouchableOpacity>
-              </View>
-            ) : null}
-            {(!bankAccountLast4 || activeForm === 'bank') && (
-              <View style={styles.form}>
-                <Text style={styles.fieldLabel}>{t.accountHolderName}</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="John Doe"
-                  placeholderTextColor={colors.muted}
-                  value={bankHolder}
-                  onChangeText={setBankHolder}
-                  autoCapitalize="words"
-                  editable={!saving}
-                />
-                <Text style={styles.fieldLabel}>{t.routingNumber}</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="021000021"
-                  placeholderTextColor={colors.muted}
-                  value={bankRouting}
-                  onChangeText={formatRouting}
-                  keyboardType="number-pad"
-                  maxLength={9}
-                  editable={!saving}
-                />
-                <Text style={styles.fieldLabel}>{t.accountNumberLabel}</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder={t.accountNumberLabel}
-                  placeholderTextColor={colors.muted}
-                  value={bankAccount}
-                  onChangeText={formatBankAccount}
-                  keyboardType="number-pad"
-                  editable={!saving}
-                />
-                <TouchableOpacity style={styles.primaryButton} onPress={saveBank} disabled={saving} activeOpacity={0.85}>
-                  {saving ? <ActivityIndicator color={colors.accentText} /> : <Text style={styles.primaryButtonText}>{t.saveBankAccount}</Text>}
-                </TouchableOpacity>
-              </View>
-            )}
-            {bankAccountLast4 && activeForm !== 'bank' && (
-              <TouchableOpacity style={styles.addAnother} onPress={() => setActiveForm('bank')}>
-                <Ionicons name="add-circle-outline" size={20} color={colors.accent} />
-                <Text style={[styles.addAnotherText, { color: colors.accent }]}>{t.updateBankAccount}</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-
-        <Text style={styles.disclaimer}>{t.paymentDisclaimer}</Text>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      <Sheet visible={activeForm === 'bank'} onClose={() => setActiveForm(null)} title={bank?.account_last4 ? t.updateBankAccount : t.addBank}>
+        <TextField label={t.accountHolderName} icon="user" value={bankHolder} onChangeText={(v) => { setBankHolder(v); clear('holder'); }} editable={!saving} error={errors.holder} />
+        <TextField
+          label={t.routingNumber}
+          placeholder="123456789"
+          value={bankRouting}
+          onChangeText={(v) => { setBankRouting(v.replace(/\D/g, '').slice(0, 9)); clear('routing'); }}
+          keyboardType="number-pad"
+          maxLength={9}
+          editable={!saving}
+          error={errors.routing}
+        />
+        <TextField
+          label={t.accountNumberLabel}
+          placeholder="••••••••"
+          value={bankAccount}
+          onChangeText={(v) => { setBankAccount(v.replace(/\D/g, '').slice(0, 17)); clear('account'); }}
+          keyboardType="number-pad"
+          editable={!saving}
+          error={errors.account}
+        />
+        {errors.form ? <AppText variant="caption" color="error">{errors.form}</AppText> : null}
+        <Button title={bank?.account_last4 ? t.updateBankAccount : t.saveBankAccount} onPress={saveBank} loading={saving} />
+      </Sheet>
+    </Screen>
   );
-}
-
-function createStyles(colors) {
-  return StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
-    centered: { justifyContent: 'center', alignItems: 'center' },
-    scroll: { flex: 1 },
-    content: { padding: 24, paddingTop: 56, paddingBottom: 40 },
-    closeButton: { position: 'absolute', top: 48, right: 24, zIndex: 10 },
-    title: { fontSize: 28, fontWeight: '700', color: colors.text, marginBottom: 8 },
-    subtitle: { fontSize: 15, color: colors.textSecondary, marginBottom: 28 },
-    section: { marginBottom: 24 },
-    sectionTitle: { fontSize: 13, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
-    card: {
-      backgroundColor: colors.card,
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: colors.border,
-      padding: 18,
-    },
-    savedRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    savedLeft: { flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1 },
-    savedLabel: { fontSize: 16, fontWeight: '600', color: colors.text },
-    savedDetail: { fontSize: 14, color: colors.textSecondary, marginTop: 2 },
-    link: { fontSize: 15, fontWeight: '600' },
-    form: { gap: 14 },
-    fieldLabel: { fontSize: 14, fontWeight: '500', color: colors.textSecondary },
-    input: {
-      backgroundColor: colors.background,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 12,
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-      fontSize: 16,
-      color: colors.text,
-    },
-    primaryButton: {
-      backgroundColor: colors.accent,
-      paddingVertical: 16,
-      borderRadius: 14,
-      alignItems: 'center',
-      marginTop: 8,
-    },
-    primaryButtonText: { fontSize: 16, fontWeight: '700', color: colors.accentText },
-    addAnother: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 14 },
-    addAnotherText: { fontSize: 15, fontWeight: '600' },
-    disclaimer: { fontSize: 13, color: colors.muted, marginTop: 8, lineHeight: 18 },
-  });
 }

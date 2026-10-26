@@ -1,40 +1,32 @@
 import { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
+import { View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { createWalletUser } from '../../lib/functions';
 import { doc, getDoc } from 'firebase/firestore';
+import { createWalletUser } from '../../lib/functions';
 import { auth, db } from '../../lib/firebase';
 import { useAuth } from '../../lib/useAuth';
-import { useTheme } from '../../lib/ThemeContext';
 import { useLanguage } from '../../lib/LanguageContext';
+import { AppText, Button, IconChip, LogoMark, Screen, TextField } from '../../components/ui';
 
 export default function OnboardingScreen() {
   const router = useRouter();
   const { setProfile } = useAuth();
-  const { colors } = useTheme();
   const { t } = useLanguage();
-  const styles = createStyles(colors);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
 
   async function handleSubmit() {
     const trimmedName = name.trim();
     const trimmedPhone = phone.trim();
-    if (!trimmedName || !trimmedPhone) {
-      Alert.alert(t.error, t.errNamePhone);
-      return;
-    }
+    const next = {
+      name: trimmedName ? null : t.errNameRequired,
+      phone: trimmedPhone ? null : t.errPhoneRequired,
+    };
+    setErrors(next);
+    if (next.name || next.phone) return;
+
     setLoading(true);
     try {
       const uid = auth.currentUser.uid;
@@ -43,131 +35,56 @@ export default function OnboardingScreen() {
       const snap = await getDoc(doc(db, 'users', uid));
       const data = snap.exists() ? snap.data() : null;
       setProfile(data);
-      // Redirect based on role/wallet presence
       const role = String(data?.role || '').toLowerCase();
-      if (!data || !data.wallet_id) {
-        // stay on onboarding or show error — but we've just created wallet_id above, so fallback to wallet
-        router.replace('/(app)/(tabs)/wallet');
-        return;
-      }
-      if (role === 'mcp') {
-        router.replace('/(app)/admin/mcp-dashboard');
-        return;
-      }
-      if (role === 'admin') {
-        router.replace('/(app)/admin');
-        return;
-      }
+      if (role === 'mcp') return router.replace('/(app)/admin/mcp-dashboard');
+      if (role === 'admin') return router.replace('/(app)/admin');
       router.replace('/(app)/(tabs)/wallet');
     } catch (e) {
-      Alert.alert(t.error, e?.message || t.errCreateWallet);
+      setErrors({ form: e?.message || t.errCreateWallet });
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <View style={styles.card}>
-        <Text style={styles.title}>{t.createWallet}</Text>
-        <Text style={styles.subtitle}>{t.createWalletSubtitle}</Text>
-        <TextInput
-          style={styles.input}
-          placeholder={t.fullName}
-          placeholderTextColor={colors.muted}
-          value={name}
-          onChangeText={setName}
-          editable={!loading}
-        />
-        <Text style={styles.inputLabel}>{t.phoneNumber}</Text>
-        <TextInput
-          style={styles.input}
-          placeholder={t.phonePlaceholder}
-          placeholderTextColor={colors.muted}
-          value={phone}
-          onChangeText={setPhone}
-          keyboardType="phone-pad"
-          editable={!loading}
-        />
-        <Text style={styles.hint}>{t.phoneHint}</Text>
-        <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={handleSubmit}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color={colors.accentText} />
-          ) : (
-            <Text style={styles.buttonText}>{t.continue}</Text>
-          )}
-        </TouchableOpacity>
+    <Screen edges={['top', 'bottom']} contentStyle={{ paddingTop: 32 }} footer={<Button title={t.continue} onPress={handleSubmit} loading={loading} />}>
+      <View style={{ gap: 16 }}>
+        <LogoMark size={48} />
+        <AppText variant="display" accessibilityRole="header">{t.createWallet}</AppText>
+        <AppText variant="body" color="muted">{t.createWalletSubtitle}</AppText>
       </View>
-    </KeyboardAvoidingView>
-  );
-}
 
-function createStyles(colors) {
-  return StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-      justifyContent: 'center',
-      padding: 24,
-    },
-    card: {
-      backgroundColor: colors.card,
-      borderRadius: 24,
-      padding: 32,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    title: {
-      fontSize: 24,
-      fontWeight: '700',
-      color: colors.text,
-      marginBottom: 8,
-    },
-    subtitle: {
-      fontSize: 15,
-      color: colors.textSecondary,
-      marginBottom: 28,
-    },
-    inputLabel: {
-      fontSize: 13,
-      color: colors.textSecondary,
-      marginBottom: 8,
-    },
-    hint: {
-      fontSize: 12,
-      color: colors.muted,
-      marginTop: 6,
-      marginBottom: 14,
-    },
-    input: {
-      backgroundColor: colors.background,
-      borderRadius: 14,
-      padding: 18,
-      fontSize: 17,
-      color: colors.text,
-      marginBottom: 14,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    button: {
-      backgroundColor: colors.accent,
-      borderRadius: 14,
-      padding: 18,
-      alignItems: 'center',
-      marginTop: 8,
-    },
-    buttonDisabled: { opacity: 0.7 },
-    buttonText: {
-      fontSize: 17,
-      fontWeight: '700',
-      color: colors.accentText,
-    },
-  });
+      <View style={{ gap: 16 }}>
+        <TextField
+          label={t.fullName}
+          icon="user"
+          value={name}
+          onChangeText={(v) => { setName(v); setErrors((e) => ({ ...e, name: null })); }}
+          autoComplete="name"
+          textContentType="name"
+          editable={!loading}
+          error={errors.name}
+        />
+        <TextField
+          label={t.phoneNumber}
+          icon="phone"
+          placeholder={t.phonePlaceholder}
+          value={phone}
+          onChangeText={(v) => { setPhone(v); setErrors((e) => ({ ...e, phone: null })); }}
+          keyboardType="phone-pad"
+          autoComplete="tel"
+          textContentType="telephoneNumber"
+          editable={!loading}
+          error={errors.phone}
+          hint={t.phoneHint}
+        />
+        {errors.form ? <AppText variant="caption" color="error">{errors.form}</AppText> : null}
+      </View>
+
+      <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+        <IconChip icon="shield" />
+        <AppText variant="caption" color="muted" style={{ flex: 1 }}>{t.onboardingPrivacy}</AppText>
+      </View>
+    </Screen>
+  );
 }

@@ -1,69 +1,54 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { Alert, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../../lib/useAuth';
-import { useTheme } from '../../../lib/ThemeContext';
+import { useLanguage } from '../../../lib/LanguageContext';
 import { adminBackfillProfiles } from '../../../lib/functions';
-import { Ionicons } from '@expo/vector-icons';
+import { AppText, Header, ListGroup, ListItem, Screen } from '../../../components/ui';
 
 export default function AdminHome() {
   const router = useRouter();
   const { profile } = useAuth();
-  const { colors } = useTheme();
+  const { t } = useLanguage();
   const [syncing, setSyncing] = useState(false);
   if (!profile || String(profile.role || '').toLowerCase() !== 'admin') return null;
 
-  const handleSyncProfiles = async () => {
+  async function handleSyncProfiles() {
     setSyncing(true);
     try {
       const { count } = await adminBackfillProfiles();
-      Alert.alert('Profiles synced', `${count} users updated.`);
+      Alert.alert(t.profilesSynced, t.profilesSyncedMsg.replace('{n}', String(count)));
     } catch (err) {
-      Alert.alert('Error', err.message || String(err));
+      Alert.alert(t.error, err.message || String(err));
     } finally {
       setSyncing(false);
     }
-  };
+  }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.title, { color: colors.text }]}>Admin Dashboard</Text>
+    <Screen edges={['top', 'bottom']}>
+      <Header title={t.adminDashboard} subtitle={t.adminSubtitle} />
 
-      <View style={styles.grid}>
-        <TouchableOpacity style={[styles.tile, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => router.push('/(app)/admin/users')}>
-          <Ionicons name="people-outline" size={28} color={colors.accent} />
-          <Text style={[styles.tileText, { color: colors.text }]}>Users</Text>
-        </TouchableOpacity>
+      <ListGroup title={t.adminManage}>
+        <ListItem icon="users" title={t.adminUsers} subtitle={t.adminUsersHint} onPress={() => router.push('/(app)/admin/users')} />
+        <ListItem icon="receipt" title={t.adminTransactions} subtitle={t.adminTransactionsHint} onPress={() => router.push('/(app)/admin/transactions')} />
+        <ListItem icon="activity" title={t.globalActivity} subtitle={t.globalActivityHint} onPress={() => router.push('/(app)/admin/activities')} />
+        <ListItem icon="megaphone" tone="highlight" title={t.adminAds} subtitle={t.adminAdsSubtitle} onPress={() => router.push('/(app)/admin/ads')} />
+      </ListGroup>
 
-        <TouchableOpacity style={[styles.tile, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => router.push('/(app)/admin/transactions')}>
-          <Ionicons name="swap-horizontal-outline" size={28} color={colors.accent} />
-          <Text style={[styles.tileText, { color: colors.text }]}>Transactions</Text>
-        </TouchableOpacity>
+      <ListGroup title={t.adminMaintenance}>
+        <ListItem
+          icon="refresh"
+          tone="neutral"
+          title={syncing ? t.syncing : t.syncProfiles}
+          subtitle={t.syncProfilesHint}
+          onPress={syncing ? undefined : handleSyncProfiles}
+        />
+      </ListGroup>
 
-        <TouchableOpacity style={[styles.tile, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => router.push('/(app)/admin/activities')}>
-          <Ionicons name="reader-outline" size={28} color={colors.accent} />
-          <Text style={[styles.tileText, { color: colors.text }]}>Activities</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={[styles.tile, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => router.push('/(app)/admin/ads')}>
-          <Ionicons name="megaphone-outline" size={28} color={colors.accent} />
-          <Text style={[styles.tileText, { color: colors.text }]}>Ads</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={[styles.tile, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={handleSyncProfiles} disabled={syncing}>
-          {syncing ? <ActivityIndicator color={colors.accent} /> : <Ionicons name="sync-outline" size={28} color={colors.accent} />}
-          <Text style={[styles.tileText, { color: colors.text }]}>Sync profiles</Text>
-        </TouchableOpacity>
+      <View style={{ paddingHorizontal: 4 }}>
+        <AppText variant="caption" color="muted">{t.adminFooter}</AppText>
       </View>
-
-    </View>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, paddingTop: 20 },
-  title: { fontSize: 22, fontWeight: '700', marginBottom: 16 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between' },
-  tile: { width: '48%', padding: 18, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  tileText: { marginTop: 8, fontSize: 15, fontWeight: '600' },
-});
