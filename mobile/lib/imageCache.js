@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 // Simple image cache: download remote image to FileSystem.cacheDirectory and return local URI
 // Usage: const localUri = await cacheImageAsync(remoteUri)

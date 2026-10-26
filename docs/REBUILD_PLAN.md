@@ -4,7 +4,8 @@ Branch: `rebuild` (snapshot of pre-rebuild work: `25780a9` on `main`).
 
 Decisions: keep Firebase + Expo (upgrade to current SDK, move to TypeScript), refactor in
 place, all features in v1 (send/wallet/activity, Mobile Money, kiosk, admin). New visual
-identity: "Malachite & Copper" brand board.
+identity: "Malachite & Copper" brand board. Card funding: Stripe. Kiosk fee stays 10% of the
+amount (7% agent commission, 3% Monet).
 
 ## Phase 1 — Security and money correctness (in progress)
 
@@ -43,16 +44,29 @@ Remaining:
 - Store money as integer cents; add a ledger collection so every balance change has an
   entry, and a reconciliation check.
 - Idempotency keys on every money callable (retry-safe from the app).
-- Integrate a real card processor (Stripe or Swiftech card collection: decision needed).
+- Integrate Stripe for card funding (PaymentIntents; credit the wallet from the Stripe
+  webhook, not from the app).
 - Size limit on `uploadProfilePhoto`; App Check on callables.
-- Kiosk fee maths and agent balance accounting: confirm the intended model with the business.
+- Kiosk agent balance accounting: the MPA is credited `client_net + commission`; confirm
+  that is the intended settlement model.
 
 ## Phase 2 — Backend modernisation
 TypeScript Cloud Functions, shared types with the app, function tests on the emulator.
 
-## Phase 3 — App foundation
-Upgrade Expo SDK, TypeScript, design tokens from the brand board (replace `ThemeContext`),
-shared components (Button, Input, AmountField, TransactionRow, StatusBadge).
+## Phase 3 — App foundation (done)
+- Expo SDK 51 → 58 (React 19, RN 0.88, expo-router 58, Firebase 13). Requires Node ≥ 22.13;
+  the repo pins Node 24 in `.nvmrc` (`nvm use`).
+- `android/` removed (stale SDK 51 prebuild); native projects are generated on demand
+  (`npx expo prebuild` / EAS). `babel.config.js` removed (Expo's default preset applies).
+- Auth sessions persist across restarts (`initializeAuth` + AsyncStorage).
+- TypeScript enabled (`tsconfig.json`, strict). New code is TS; existing screens convert in phase 4.
+- Design tokens in `mobile/lib/theme/tokens.ts`; `ThemeContext` keeps its old colour names
+  (so every screen already uses the new palette) and follows the device light/dark setting
+  unless the user picked one.
+- Sora + Inter fonts loaded in `app/_layout.js`; new icon, adaptive icon, splash and favicon.
+- Shared components in `mobile/components/ui`: AppText, Button, Card, Logo/LogoMark,
+  StatusBadge, TextField, TransactionRow. Money formatting in `lib/format.ts`.
+- Send helpers moved out of `app/` (expo-router treated them as screens).
 
 ## Phase 4 — Screens, one flow at a time
 Auth + onboarding → Wallet → Send → Activity → Mobile Money → Kiosk (user + agent) →

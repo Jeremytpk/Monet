@@ -17,6 +17,7 @@ import { useAuth } from '../../../lib/useAuth';
 import { useTheme } from '../../../lib/ThemeContext';
 import { useLanguage } from '../../../lib/LanguageContext';
 import { cacheImageAsync, warmCacheAsync } from '../../../lib/imageCache';
+import { Logo } from '../../../components/ui';
 
 const BANNER_GAP = 14;
 const BANNER_SLIDE_WIDTH = Dimensions.get('window').width - 48 - BANNER_GAP;
@@ -170,12 +171,7 @@ export default function WalletScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <View style={styles.topBar}>
-        <View style={styles.logoRow}>
-          <View style={styles.logoIcon}>
-            <Ionicons name="wallet" size={24} color={colors.accent} />
-          </View>
-          <Text style={styles.brandName}>Monet</Text>
-        </View>
+        <Logo size={34} />
         <View style={styles.topBarActions}>
           <TouchableOpacity onPress={toggleLang} style={styles.langButton} hitSlop={12}>
             <Text style={styles.langButtonText}>{lang === 'en' ? 'FR' : 'EN'}</Text>
@@ -375,7 +371,7 @@ function createStyles(colors) {
       height: '100%',
     },
     bannerOverlay: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       backgroundColor: 'rgba(0,0,0,0.35)',
     },
     bannerTextWrap: {

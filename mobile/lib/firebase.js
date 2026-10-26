@@ -1,7 +1,10 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+// On React Native, Metro resolves firebase/auth to its RN build, which exports
+// getReactNativePersistence (the web typings don't list it).
+import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const config = {
   apiKey: "AIzaSyAtR_mm9W6pHFP6hBmk6saAY9nuMWcZiyk",
@@ -14,7 +17,8 @@ const config = {
 };
 
 const app = initializeApp(config);
-export const auth = getAuth(app);
+// Keep users signed in across app restarts.
+export const auth = initializeAuth(app, { persistence: getReactNativePersistence(AsyncStorage) });
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 export default app;

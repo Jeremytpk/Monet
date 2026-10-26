@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { View, Image, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { useRouter, useSegments } from 'expo-router';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -10,19 +10,22 @@ import { AuthProvider, useAuth } from '../lib/useAuth';
 import { ThemeProvider, useTheme } from '../lib/ThemeContext';
 import { LanguageProvider } from '../lib/LanguageContext';
 import * as SplashScreen from 'expo-splash-screen';
+import { useFonts, Sora_600SemiBold, Sora_700Bold } from '@expo-google-fonts/sora';
+import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from '@expo-google-fonts/inter';
+import { Logo, AppText } from '../components/ui';
 
 SplashScreen.preventAutoHideAsync();
 
-function RootLayoutNav() {
+function RootLayoutNav({ fontsReady }) {
   const router = useRouter();
   const segments = useSegments();
   const { user, profile, setUser, setProfile, loading, setLoading } = useAuth();
-  const { isDark: themeIsDark } = useTheme();
+  const { isDark: themeIsDark, colors } = useTheme();
   const isInsideApp = segments[0] === '(app)';
 
   useEffect(() => {
-    SplashScreen.hideAsync();
-  }, []);
+    if (fontsReady) SplashScreen.hideAsync();
+  }, [fontsReady]);
 
   useEffect(() => {
     let unsubProfile;
@@ -74,13 +77,14 @@ function RootLayoutNav() {
     }
   }, [user, profile, loading, isInsideApp]);
 
+  if (!fontsReady) return null; // native splash stays up until fonts load
+
   if (loading) {
     return (
-      <View style={styles.container}>
-        <StatusBar style="light" />
-        <Text style={styles.appName}>Monet</Text>
-        <Image source={require('../assets/icon.png')} style={styles.logo} resizeMode="contain" />
-        <Text style={styles.poweredBy}>powered by Jerttech</Text>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <StatusBar style={themeIsDark ? 'light' : 'dark'} />
+        <Logo size={48} />
+        <AppText variant="caption" color="muted" style={styles.poweredBy}>powered by Jerttech</AppText>
       </View>
     );
   }
@@ -96,36 +100,30 @@ function RootLayoutNav() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0D0D0D',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  appName: {
-    fontSize: 42,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    marginBottom: 40,
-    letterSpacing: 2,
-  },
-  logo: {
-    width: 140,
-    height: 140,
   },
   poweredBy: {
     position: 'absolute',
     bottom: 48,
-    color: '#888',
-    fontSize: 13,
-    letterSpacing: 0.5,
   },
 });
 
 export default function RootLayout() {
+  // If a font fails to load, carry on with system fonts rather than block the app.
+  const [fontsLoaded, fontError] = useFonts({
+    Sora_600SemiBold,
+    Sora_700Bold,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+  });
+
   return (
     <ThemeProvider>
       <LanguageProvider>
         <AuthProvider>
-          <RootLayoutNav />
+          <RootLayoutNav fontsReady={fontsLoaded || !!fontError} />
         </AuthProvider>
       </LanguageProvider>
     </ThemeProvider>

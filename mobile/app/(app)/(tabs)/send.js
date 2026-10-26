@@ -22,8 +22,8 @@ import { useTheme } from '../../../lib/ThemeContext';
 import { useLanguage } from '../../../lib/LanguageContext';
 import { initiateTransfer } from '../../../lib/functions';
 import { initiateKioskCashOut } from '../../../lib/kiosk';
-import { useRecipientData } from './useRecipientData';
-import { KioskSearchModal, KioskConfirmModal, GuestView } from './SendScreenModals';
+import { useRecipientData } from '../../../components/send/useRecipientData';
+import { KioskSearchModal, KioskConfirmModal, GuestView } from '../../../components/send/SendScreenModals';
 
 export default function SendScreen() {
   const { user, profile } = useAuth();
