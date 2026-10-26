@@ -12,7 +12,7 @@ import { useLanguage } from '../../../lib/LanguageContext';
 export default function ActivityScreen() {
   const { user } = useAuth();
   const { colors } = useTheme();
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const router = useRouter();
   const styles = createStyles(colors);
   const [transactions, setTransactions] = useState([]);
@@ -75,7 +75,7 @@ export default function ActivityScreen() {
   function formatDate(ts) {
     if (!ts?.toDate) return '—';
     const d = ts.toDate();
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleDateString(lang === 'fr' ? 'fr-FR' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   }
 
   async function handleVerifyPassword() {
@@ -221,7 +221,7 @@ export default function ActivityScreen() {
           <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border, alignItems: 'center' }]}>
             <Text style={[styles.modalTitle, { color: colors.text, marginBottom: 8 }]}>{t.activeWithdrawalCode}</Text>
             <Text style={{ color: colors.textSecondary, marginBottom: 24, textAlign: 'center' }}>
-              Show this 6-digit code to the kiosk agent to receive your cash.
+              {t.showCodeToAgent || 'Show this 6-digit code to the kiosk agent to receive your cash.'}
             </Text>
             
             <View style={[styles.codeBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
@@ -258,7 +258,7 @@ export default function ActivityScreen() {
                 </View>
                 <View style={styles.detailRow}>
                   <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t.txStatus || 'Status'}</Text>
-                  <Text style={[styles.detailValue, { color: colors.text, textTransform: 'capitalize' }]}>{selectedTx.status}</Text>
+                  <Text style={[styles.detailValue, { color: colors.text, textTransform: 'capitalize' }]}>{t[selectedTx.status?.toLowerCase()] || selectedTx.status}</Text>
                 </View>
                 <View style={styles.detailRow}>
                   <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t.amount || 'Amount'}</Text>

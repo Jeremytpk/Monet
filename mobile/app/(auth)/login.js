@@ -13,15 +13,17 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { auth, db } from '../../lib/firebase';
 import { useTheme } from '../../lib/ThemeContext';
 import { useLanguage } from '../../lib/LanguageContext';
+import { useRouter } from 'expo-router';
 
 export default function LoginScreen() {
   const { colors } = useTheme();
   const { t } = useLanguage();
   const styles = createStyles(colors);
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -47,8 +49,44 @@ export default function LoginScreen() {
           email: user.email,
           created_at: serverTimestamp(),
         }, { merge: true });
+        // After signup, send user to onboarding to finish profile
+        router.replace('/(auth)/onboarding');
+        return;
       } else {
-        await signInWithEmailAndPassword(auth, email.trim(), password);
+        const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+        const user = cred.user || auth.currentUser;
+        if (user && user.uid) {
+          // Try to load the user's profile immediately and redirect based on role
+          try {
+            const snap = await getDoc(doc(db, 'users', user.uid));
+            if (!snap.exists()) {
+              // No profile yet -> onboarding
+              router.replace('/(auth)/onboarding');
+              return;
+            }
+            const data = snap.data() || {};
+            const role = String(data.role || '').toLowerCase();
+            if (!data.wallet_id) {
+              router.replace('/(auth)/onboarding');
+              return;
+            }
+            if (role === 'mcp') {
+              router.replace('/(app)/admin/mcp-dashboard');
+              return;
+            }
+            if (role === 'admin') {
+              router.replace('/(app)/admin');
+              return;
+            }
+            // Default to wallet
+            router.replace('/(app)/(tabs)/wallet');
+            return;
+          } catch (err) {
+            // If profile read fails, fall back to app root behavior
+            router.replace('/(app)/(tabs)/wallet');
+            return;
+          }
+        }
       }
     } catch (e) {
       Alert.alert(t.error, e.message || t.authFailed);

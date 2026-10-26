@@ -4,6 +4,7 @@
     "slug": "monet",
     "version": "1.0.0",
     "orientation": "portrait",
+    "sdkVersion": "51.0.0",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "scheme": "monet",
@@ -12,28 +13,50 @@
       "resizeMode": "contain",
       "backgroundColor": "#0D0D0D"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.jerttech.monet"
+      "bundleIdentifier": "com.jerttech.monet",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0D0D0D"
       },
-      "package": "com.jerttech.monet"
+      "package": "com.jerttech.monet",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "plugins": [
       "expo-router",
       "expo-updates",
-      ["expo-image-picker", { "photosPermission": "Allow Monet to access your photos for your profile picture.", "cameraPermission": "Allow Monet to use your camera to take a profile photo." }]
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Monet to access your photos for your profile picture.",
+          "cameraPermission": "Allow Monet to use your camera to take a profile photo."
+        }
+      ]
     ],
     "updates": {
       "fallbackToCacheTimeout": 0
     },
     "runtimeVersion": {
       "policy": "sdkVersion"
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "2921d89b-9c10-4e27-a87f-325abc6dbe5b"
+      }
     }
   }
 }

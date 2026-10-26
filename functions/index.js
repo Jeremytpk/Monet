@@ -548,6 +548,11 @@ export const adminCancelTransaction = onCall({ enforceAppCheck: false }, async (
   if (!txSnap.exists) throw new HttpsError('not-found', 'Transaction not found');
   const txData = txSnap.data();
   if (txData.status === 'cancelled') return { success: true, message: 'Already cancelled' };
+  
+  const txTime = txData.timestamp?.toDate?.().getTime() || 0;
+  if (txTime > 0 && (Date.now() - txTime) > 24 * 60 * 60 * 1000) {
+    throw new HttpsError('failed-precondition', 'Transactions older than 24 hours cannot be cancelled.');
+  }
 
   const senderId = txData.sender_id;
   const receiverId = txData.receiver_id;

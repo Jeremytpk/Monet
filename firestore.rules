@@ -2,6 +2,16 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Helper function to check if the current user is an admin
+    function isAdmin() {
+      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'Admin'];
+    }
+
+    // Allow admins to read and write all documents globally
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+
     // Users: own profile read/write; any authenticated user can read others (for Send-to recipient list)
     match /users/{userId} {
       allow read: if request.auth != null;
@@ -20,9 +30,7 @@ service cloud.firestore {
       allow read: if true;
 
       // Only allow authenticated users whose profile role (case-insensitive) is 'admin' to write
-      allow create, update, delete: if request.auth != null &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role != null &&
-         toLower(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role) == 'admin');
+      allow create, update, delete: if isAdmin();
     }
 
     // MPA Accounts: only the MCP (Money Partner Account owner) can read/write their own

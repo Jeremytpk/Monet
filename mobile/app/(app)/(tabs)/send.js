@@ -9,20 +9,21 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   ScrollView,
-  Image,
-  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 import { useAuth } from '../../../lib/useAuth';
 import { useTheme } from '../../../lib/ThemeContext';
 import { useLanguage } from '../../../lib/LanguageContext';
 import { initiateTransfer } from '../../../lib/functions';
 import { initiateKioskCashOut } from '../../../lib/kiosk';
+import { useRecipientData } from './useRecipientData';
+import { KioskSearchModal, KioskConfirmModal, GuestView } from './SendScreenModals';
 
 export default function SendScreen() {
   const { user, profile } = useAuth();
@@ -30,14 +31,14 @@ export default function SendScreen() {
   const { t } = useLanguage();
   const router = useRouter();
   const styles = createStyles(colors);
-  const [recipients, setRecipients] = useState([]);
-  const [loading, setLoading] = useState(true);
+
+  const { recipients, setRecipients, mostSentUids, loading } = useRecipientData(user, t);
+
   const [selectedUid, setSelectedUid] = useState(null);
   const [amount, setAmount] = useState('');
   const [fundingSource, setFundingSource] = useState('wallet');
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [mostSentUids, setMostSentUids] = useState([]);
   const [showRecent, setShowRecent] = useState(true);
 
   const [kioskSearchModal, setKioskSearchModal] = useState(false);
@@ -68,55 +69,6 @@ export default function SendScreen() {
     .map((uid) => recipients.find((r) => r.id === uid))
     .filter(Boolean);
 
-  useEffect(() => {
-    if (!user?.uid) {
-      setLoading(false);
-      return;
-    }
-    (async () => {
-      setLoading(true);
-      try {
-        const list = [];
-        const usersSnap = await getDocs(collection(db, 'users'));
-        usersSnap.forEach((d) => {
-          if (d.id !== user.uid) list.push({ id: d.id, ...d.data() });
-        });
-        setRecipients(list);
-      } catch (e) {
-        Alert.alert(t.error, e?.message || t.errLoadRecipients);
-        setRecipients([]);
-      }
-
-      try {
-        const txSnap = await getDocs(
-          query(
-            collection(db, 'users', user.uid, 'transactions'),
-            where('status', '==', 'completed'),
-            orderBy('timestamp', 'desc'),
-            limit(200)
-          )
-        );
-        const seen = new Set();
-        const uids = [];
-        txSnap.forEach((d) => {
-          const data = d.data();
-          if (data.type === 'outgoing_transfer' && data.receiver_id && !seen.has(data.receiver_id)) {
-            seen.add(data.receiver_id);
-            uids.push(data.receiver_id);
-          } else if (data.type === 'kiosk_withdrawal' && data.metadata?.mcp_uid && !seen.has(data.metadata.mcp_uid)) {
-            seen.add(data.metadata.mcp_uid);
-            uids.push(data.metadata.mcp_uid);
-          }
-        });
-        setMostSentUids(uids);
-      } catch {
-        setMostSentUids([]);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [user?.uid]);
-
   const selectedRecipient = recipients.find((r) => r.id === selectedUid);
   const isKiosk = String(selectedRecipient?.role || '').toLowerCase() === 'mcp' || !!selectedRecipient?.mcp_id;
 
@@ -128,7 +80,7 @@ export default function SendScreen() {
       const searchStr = kioskSearchId.trim().toUpperCase().replace('MCP', '');
       const q = query(collection(db, 'users'), where('role', '==', 'mcp'));
       const snap = await getDocs(q);
-      
+
       const doc = snap.docs.find((d) => {
         const mcpId = d.data().mcp_id;
         return mcpId && mcpId.toUpperCase().includes(searchStr);
@@ -226,30 +178,7 @@ export default function SendScreen() {
   };
 
   if (!user) {
-    return (
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.guestContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.header}>
-          <Text style={styles.title}>{t.sendMoney}</Text>
-          <Text style={styles.subtitle}>{t.sendMoneySubtitle}</Text>
-        </View>
-        <View style={styles.guestCard}>
-          <Ionicons name="lock-closed-outline" size={48} color={colors.muted} style={styles.guestIcon} />
-          <Text style={styles.guestTitle}>{t.signInToAccessSettings}</Text>
-          <Text style={styles.guestMessage}>{t.signInMessage}</Text>
-          <TouchableOpacity
-            style={styles.guestButton}
-            onPress={() => router.push('/(app)/login')}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.guestButtonText}>{t.logIn}</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    );
+    return <GuestView styles={styles} colors={colors} t={t} router={router} />;
   }
 
   if (loading) {
@@ -345,11 +274,11 @@ export default function SendScreen() {
                   return (
                     <TouchableOpacity
                       key={item.id}
-                      style={[styles.searchResultRow, isSelected && styles.searchResultRowSelected]}
+                      style={[styles.searchResultRow, isSelected && styles.searchResultRowSelected, { borderColor: isSelected ? colors.accent : 'transparent' }]}
                       onPress={() => setSelectedUid(item.id)}
                       activeOpacity={0.7}
                     >
-                      <View style={[styles.searchResultAvatar, isSelected && styles.avatarSelected]}>
+                      <View style={[styles.searchResultAvatar, isSelected && styles.avatarSelected, { backgroundColor: isSelected ? colors.accent : colors.border }]}>
                         <Ionicons 
                           name={isResultMcp ? 'storefront-outline' : 'person-outline'} 
                           size={20} 
@@ -357,7 +286,7 @@ export default function SendScreen() {
                         />
                       </View>
                       <View style={styles.searchResultInfo}>
-                        <Text style={[styles.searchResultName, isSelected && styles.recipientNameSelected]} numberOfLines={1}>
+                        <Text style={[styles.searchResultName, isSelected && styles.recipientNameSelected, { color: isSelected ? colors.accent : colors.text }]} numberOfLines={1}>
                           {item.name || t.noName}
                         </Text>
                         <Text style={styles.searchResultPhone} numberOfLines={1}>{item.phone || ''}</Text>
@@ -396,7 +325,7 @@ export default function SendScreen() {
                               onPress={() => setSelectedUid(item.id)}
                               activeOpacity={0.7}
                             >
-                              <View style={[styles.mostSentAvatar, isSelected && styles.avatarSelected]}>
+                              <View style={[styles.mostSentAvatar, isSelected && styles.avatarSelected, { backgroundColor: isSelected ? colors.accent : colors.border }]}>
                                 <Ionicons 
                                   name={isRecentMcp ? 'storefront-outline' : 'person-outline'} 
                                   size={24} 
@@ -477,152 +406,43 @@ export default function SendScreen() {
       </ScrollView>
 
       {/* Kiosk Search Modal */}
-      <Modal
+      <KioskSearchModal
         visible={kioskSearchModal}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setKioskSearchModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ width: '100%' }}>
-            <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>{t.findKiosk || 'Find Kiosk'}</Text>
-                <TouchableOpacity onPress={() => setKioskSearchModal(false)} hitSlop={12}>
-                  <Ionicons name="close" size={24} color={colors.text} />
-                </TouchableOpacity>
-              </View>
-
-              <Text style={styles.fieldLabel}>{t.kioskMcpId || 'Kiosk MCP ID'}</Text>
-              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
-                <TextInput
-                  style={[styles.modalInput, { flex: 1, backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
-                  placeholder="e.g. MCP1234567"
-                  placeholderTextColor={colors.muted}
-                  value={kioskSearchId}
-                  onChangeText={(text) => setKioskSearchId(text.toUpperCase().replace(/\s/g, ''))}
-                  autoCapitalize="characters"
-                />
-                <TouchableOpacity
-                  style={[styles.searchBtn, { backgroundColor: colors.accent }]}
-                  onPress={handleSearchKiosk}
-                  disabled={kioskSearchLoading || !kioskSearchId}
-                >
-                  {kioskSearchLoading ? (
-                    <ActivityIndicator color={colors.accentText} />
-                  ) : (
-                    <Text style={{ color: colors.accentText, fontWeight: '600' }}>{t.search || 'Search'}</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-
-              {foundKiosk && (
-                <TouchableOpacity
-                  style={[styles.foundKioskCard, { borderColor: colors.border, backgroundColor: colors.background }]}
-                  onPress={() => {
-                    if (!recipients.find(r => r.id === foundKiosk.id)) {
-                      setRecipients([foundKiosk, ...recipients]);
-                    }
-                    setSelectedUid(foundKiosk.id);
-                    setFundingSource('wallet');
-                    setKioskSearchModal(false);
-                    setFoundKiosk(null);
-                    setKioskSearchId('');
-                  }}
-                >
-                  <View style={[styles.searchResultAvatar, { backgroundColor: colors.border }]}>
-                    {foundKiosk.photoURL || foundKiosk.photoUrl ? (
-                      <Image source={{ uri: foundKiosk.photoURL || foundKiosk.photoUrl }} style={styles.searchResultAvatarImage} />
-                    ) : (
-                      <Text style={[styles.avatarText, { color: colors.text }]}>{(foundKiosk.name || '?').trim().charAt(0).toUpperCase()}</Text>
-                    )}
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>{foundKiosk.name}</Text>
-                    <Text style={{ fontSize: 13, color: colors.accent, marginTop: 2 }}>{foundKiosk.mcp_id}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color={colors.muted} />
-                </TouchableOpacity>
-              )}
-            </View>
-          </KeyboardAvoidingView>
-        </View>
-      </Modal>
+        onClose={() => setKioskSearchModal(false)}
+        styles={styles}
+        colors={colors}
+        t={t}
+        kioskSearchId={kioskSearchId}
+        setKioskSearchId={setKioskSearchId}
+        handleSearchKiosk={handleSearchKiosk}
+        kioskSearchLoading={kioskSearchLoading}
+        foundKiosk={foundKiosk}
+        onSelectKiosk={(kiosk) => {
+          if (!recipients.find((r) => r.id === kiosk.id)) {
+            setRecipients([kiosk, ...recipients]);
+          }
+          setSelectedUid(kiosk.id);
+          setFundingSource('wallet');
+          setKioskSearchModal(false);
+          setFoundKiosk(null);
+          setKioskSearchId('');
+        }}
+      />
 
       {/* Kiosk Confirmation Modal */}
-      <Modal
+      <KioskConfirmModal
         visible={kioskConfirmVisible}
-        animationType="fade"
-        transparent
-        onRequestClose={() => {
-          if (!withdrawalCode) setKioskConfirmVisible(false);
-          else handleCloseKioskCode();
-        }}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {!withdrawalCode ? (
-              <>
-                <Text style={[styles.modalTitle, { color: colors.text, textAlign: 'center', marginBottom: 8 }]}>{t.confirmKioskSend || 'Confirm Kiosk Send'}</Text>
-                <Text style={{ color: colors.textSecondary, marginBottom: 16, textAlign: 'center', lineHeight: 20 }}>
-                  {t.sendingFundsTo || 'You are sending funds to'} {selectedRecipient?.name} ({selectedRecipient?.mcp_id}).
-                </Text>
-
-                <View style={[styles.feeBreakdown, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                  <Text style={[styles.feeLabel, { color: colors.text }]}>Amount</Text>
-                  <Text style={[styles.feeValue, { color: colors.text }]}>${kioskFees?.grossAmount.toFixed(2)}</Text>
-
-                  <Text style={[styles.feeLabel, { color: colors.textSecondary }]}>{t.totalCommission || 'Total Commission'} (10%)</Text>
-                  <Text style={[styles.feeValue, { color: colors.text }]}>-${kioskFees?.totalFees.toFixed(2)}</Text>
-
-                  <View style={[styles.divider, { borderColor: colors.border }]} />
-
-                  <Text style={[styles.feeLabel, { color: colors.text, fontWeight: '600' }]}>{t.cashToReceive || 'Cash to Receive'}</Text>
-                  <Text style={[styles.feeValueLarge, { color: colors.accent }]}>${kioskFees?.clientNet.toFixed(2)}</Text>
-                </View>
-
-                <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
-                  <TouchableOpacity
-                    style={[styles.confirmActionBtn, { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }]}
-                    onPress={() => setKioskConfirmVisible(false)}
-                    disabled={sending}
-                  >
-                    <Text style={{ color: colors.text, fontWeight: '600' }}>{t.cancel}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.confirmActionBtn, { backgroundColor: colors.accent }]}
-                    onPress={confirmKioskSend}
-                    disabled={sending}
-                  >
-                    {sending ? (
-                      <ActivityIndicator color={colors.accentText} />
-                    ) : (
-                      <Text style={{ color: colors.accentText, fontWeight: '600' }}>{t.confirm || 'Confirm'}</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </>
-            ) : (
-              <>
-                <Text style={[styles.modalTitle, { color: colors.text, textAlign: 'center', marginBottom: 16 }]}>{t.activeWithdrawalCode || 'Your Withdrawal Code'}</Text>
-                <View style={[styles.codeBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                  <Text style={[styles.code, { color: colors.accent }]}>{withdrawalCode}</Text>
-                </View>
-                <Text style={{ color: colors.textSecondary, marginBottom: 24, textAlign: 'center' }}>
-                  {t.showCodeToAgent || 'Show this 6-digit code to the kiosk agent to receive your cash.'}
-                </Text>
-                <TouchableOpacity
-                  style={{ backgroundColor: colors.accent, paddingVertical: 16, borderRadius: 12, alignItems: 'center', width: '100%' }}
-                  onPress={handleCloseKioskCode}
-                >
-                  <Text style={{ color: colors.accentText, fontWeight: '700', fontSize: 16 }}>{t.closeCode || 'Close Code'}</Text>
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-        </View>
-      </Modal>
-
+        onClose={() => (!withdrawalCode ? setKioskConfirmVisible(false) : handleCloseKioskCode())}
+        styles={styles}
+        colors={colors}
+        t={t}
+        sending={sending}
+        withdrawalCode={withdrawalCode}
+        selectedRecipient={selectedRecipient}
+        kioskFees={kioskFees}
+        onConfirm={confirmKioskSend}
+        onCloseCode={handleCloseKioskCode}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -632,7 +452,7 @@ function createStyles(colors) {
     container: { flex: 1, backgroundColor: colors.background },
     scroll: { flex: 1 },
     centered: { justifyContent: 'center' },
-    content: { padding: 24, paddingTop: 56, paddingBottom: 40 },
+    content: { padding: 24, paddingTop: 56, paddingBottom: 40, flexGrow: 1 },
     header: { marginBottom: 28 },
     title: {
       fontSize: 30,
@@ -829,18 +649,13 @@ function createStyles(colors) {
       paddingHorizontal: 4,
       borderRadius: 12,
       marginBottom: 4,
-      borderWidth: 2,
-      borderColor: 'transparent',
-    },
-    searchResultRowSelected: {
+      borderWidth: 2,    },    searchResultRowSelected: {
       backgroundColor: colors.isDark ? 'rgba(234, 179, 8, 0.12)' : 'rgba(234, 179, 8, 0.08)',
-      borderColor: colors.accent,
     },
     searchResultAvatar: {
       width: 44,
       height: 44,
       borderRadius: 22,
-      backgroundColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: 12,
@@ -849,11 +664,9 @@ function createStyles(colors) {
     searchResultAvatarImage: { width: '100%', height: '100%' },
     searchResultInfo: { flex: 1 },
     searchResultName: { fontSize: 16, fontWeight: '600', color: colors.text },
-    searchResultPhone: { fontSize: 13, color: colors.muted, marginTop: 2 },
-    recipientNameSelected: { color: colors.accent },
-    avatarSelected: { backgroundColor: colors.accent },
+    searchResultPhone: { fontSize: 13, color: colors.muted, marginTop: 2 },    recipientNameSelected: { color: colors.accent },
+    avatarSelected: { },
     avatarText: { fontSize: 18, fontWeight: '700', color: colors.text },
-    avatarTextSelected: { color: colors.accentText },
     recentHeaderRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -884,7 +697,6 @@ function createStyles(colors) {
       width: 52,
       height: 52,
       borderRadius: 26,
-      backgroundColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
       overflow: 'hidden',

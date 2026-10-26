@@ -9,7 +9,9 @@ export default function AppLayout() {
       <Stack.Screen name="login" options={{ presentation: 'modal' }} />
       <Stack.Screen name="profile" />
       <Stack.Screen name="kiosk-withdraw" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="admin/mcp-dashboard" title="MONET" />
+      <Stack.Screen name="admin/mcp-dashboard" />
+      <Stack.Screen name="about" />
+      <Stack.Screen name="admin/activities" />
     </Stack>
   );
 }

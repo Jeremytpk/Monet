@@ -42,3 +42,6 @@ mobile/android/build
 # Testing
 coverage/
 .nyc_output/
+
+# Editor swap files
+*.swp

@@ -1,9 +1,9 @@
 {
   "build": {
     "production": {
-      "distribution": "internal",
       "ios": {
-        "simulator": false
+        "simulator": false,
+        "image": "latest"
       }
     }
   }

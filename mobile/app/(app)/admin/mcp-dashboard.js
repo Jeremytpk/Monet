@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   View,
   Text,
+  Image,
   TextInput,
   TouchableOpacity,
   StyleSheet,
@@ -108,11 +109,14 @@ export default function McpDashboard() {
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-        <View>
-          <Text style={[styles.title, { color: colors.text }]}>MONET</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            {mpaAccount?.business_name || t.mcpSubtitle}{profile?.mcp_id ? ` - ${profile.mcp_id}` : ''}
-          </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Image source={require('../../../assets/icon.png')} style={styles.logoSmall} />
+          <View>
+            <Text style={[styles.title, { color: colors.text }]}>MONET</Text>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+              {mpaAccount?.business_name || t.mcpSubtitle}{profile?.mcp_id ? ` - ${profile.mcp_id}` : ''}
+            </Text>
+          </View>
         </View>
         <TouchableOpacity onPress={() => router.push('/profile')} style={styles.settingsButton} hitSlop={12}>
           <Ionicons name="settings-outline" size={28} color={colors.text} />
@@ -122,18 +126,18 @@ export default function McpDashboard() {
       {/* Wallet Balance Card */}
       <View
         style={[
-          styles.balanceCard,
+          styles.modernCard,
           {
             backgroundColor: colors.card,
-            borderColor: colors.border,
-            borderWidth: 2,
-            marginBottom: 0,
           },
         ]}
       >
-        <Text style={[styles.balanceLabel, { color: colors.textSecondary }]}>
-          {t.walletBalance || 'Wallet Balance'}
-        </Text>
+        <View style={styles.cardHeaderRow}>
+          <Ionicons name="wallet" size={20} color={colors.textSecondary} style={{ marginRight: 8 }} />
+          <Text style={[styles.balanceLabel, { color: colors.textSecondary }]}>
+            {t.walletBalance || 'Wallet Balance'}
+          </Text>
+        </View>
         <Text style={[styles.balanceAmount, { color: colors.text }]}>
           ${(profile?.wallet_balance || 0).toFixed(2)}
         </Text>
@@ -142,48 +146,48 @@ export default function McpDashboard() {
       {/* MPA Balance Card */}
       <View
         style={[
-          styles.balanceCard,
+          styles.modernCard,
+          styles.mpaCard,
           {
             backgroundColor: colors.card,
-            borderColor: colors.border,
-            borderWidth: 2,
           },
         ]}
       >
-        <View style={{ marginBottom: 16 }}>
-          <Text style={[styles.balanceLabel, { color: colors.textSecondary }]}>
-            {t.mpaBalance}
-          </Text>
-          <Text style={[styles.balanceAmount, { color: colors.accent }]}>
-            ${(mpaAccount?.balance || 0).toFixed(2)}
-          </Text>
-        </View>
+        <View style={styles.mpaTopRow}>
+          <View>
+            <View style={styles.cardHeaderRow}>
+              <Ionicons name="briefcase" size={20} color={colors.accent} style={{ marginRight: 8 }} />
+              <Text style={[styles.balanceLabel, { color: colors.textSecondary }]}>
+                {t.mpaBalance || 'MPA Balance'}
+              </Text>
+            </View>
+            <Text style={[styles.balanceAmount, { color: colors.accent }]}>
+              ${(mpaAccount?.balance || 0).toFixed(2)}
+            </Text>
+          </View>
 
-        {/* Status Indicator */}
-        <View
-          style={[
-            styles.statusBadge,
-            { backgroundColor: statusColor + '20', borderColor: statusColor },
-          ]}
-        >
-          <View
-            style={[styles.statusDot, { backgroundColor: statusColor }]}
-          />
-          <Text style={[styles.statusText, { color: statusColor }]}>
-            {isMcpActive
-              ? t.mcpActive
-              : t.mcpInactive}
-          </Text>
+          {/* Status Pill */}
+          <View style={[styles.statusPill, { backgroundColor: statusColor + '1A' }]}>
+            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+            <Text style={[styles.statusText, { color: statusColor }]}>
+              {isMcpActive ? t.mcpActive : t.mcpInactive}
+            </Text>
+          </View>
         </View>
 
         {/* Commission Earned */}
-        <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.border }}>
-          <Text style={[styles.commissionLabel, { color: colors.textSecondary }]}>
-            {t.totalCommissionsEarned}
-          </Text>
-          <Text style={[styles.commissionAmount, { color: colors.accent }]}>
-            ${(mpaAccount?.total_commissions_earned || 0).toFixed(2)}
-          </Text>
+        <View style={[styles.commissionSection, { borderTopColor: colors.border }]}>
+          <View style={styles.commissionIconWrap}>
+            <Ionicons name="trending-up" size={18} color="#22C55E" />
+          </View>
+          <View>
+            <Text style={[styles.commissionLabel, { color: colors.textSecondary }]}>
+              {t.totalCommissionsEarned}
+            </Text>
+            <Text style={[styles.commissionAmount, { color: colors.accent }]}>
+              ${(mpaAccount?.total_commissions_earned || 0).toFixed(2)}
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -196,6 +200,7 @@ export default function McpDashboard() {
             {
               backgroundColor: colors.accent,
               opacity: isMcpActive ? 1 : 0.5,
+              shadowColor: colors.accent,
             },
           ]}
           disabled={!isMcpActive}
@@ -210,16 +215,20 @@ export default function McpDashboard() {
       {lastConfirmation && (
         <View
           style={[
-            styles.confirmationResult,
+            styles.modernCard,
             {
               backgroundColor: colors.card,
-              borderColor: colors.border,
+              borderLeftWidth: 4,
+              borderLeftColor: '#22C55E',
             },
           ]}
         >
-          <Text style={[styles.confirmationTitle, { color: colors.accent }]}>
-            {t.lastTransaction}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+            <Ionicons name="checkmark-circle" size={20} color="#22C55E" style={{ marginRight: 8 }} />
+            <Text style={[styles.confirmationTitle, { color: colors.text }]}>
+              {t.lastTransaction}
+            </Text>
+          </View>
           <Text style={[styles.confirmationDetail, { color: colors.text }]}>
             {t.amountSent || 'Amount Sent'}: ${lastConfirmation.gross_amount.toFixed(2)}
           </Text>
@@ -249,29 +258,30 @@ export default function McpDashboard() {
             scrollEnabled={false}
             data={transactions}
             keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <View
-                style={[
-                  styles.txRow,
-                  {
-                    backgroundColor: colors.card,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.txType, { color: colors.text }]}>
-                    {item.type === 'kiosk_commission' ? t.kioskCommission : t.deposit}
-                  </Text>
-                  <Text style={[styles.txTime, { color: colors.textSecondary }]}>
-                    {item.timestamp?.toDate?.()?.toLocaleDateString() || 'N/A'}
+            renderItem={({ item }) => {
+              const isComm = item.type === 'kiosk_commission';
+              const iconColor = isComm ? '#22C55E' : '#3B82F6';
+              const bgOpacity = isComm ? 'rgba(34, 197, 94, 0.15)' : 'rgba(59, 130, 246, 0.15)';
+              
+              return (
+                <View style={[styles.txRow, { backgroundColor: colors.card, borderColor: 'rgba(0,0,0,0.03)' }]}>
+                  <View style={[styles.iconWrap, { backgroundColor: bgOpacity }]}>
+                    <Ionicons name={isComm ? 'cash-outline' : 'arrow-down'} size={20} color={iconColor} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.txType, { color: colors.text }]}>
+                      {isComm ? t.kioskCommission : t.deposit}
+                    </Text>
+                    <Text style={[styles.txTime, { color: colors.textSecondary }]}>
+                      {item.timestamp?.toDate?.()?.toLocaleDateString() || 'N/A'}
+                    </Text>
+                  </View>
+                  <Text style={[styles.txAmount, { color: colors.text }]}>
+                    <Text style={{ color: iconColor }}>+</Text>${(item.commission_earned || item.amount || 0).toFixed(2)}
                   </Text>
                 </View>
-                <Text style={[styles.txAmount, { color: colors.accent }]}>
-                  +${(item.commission_earned || item.amount || 0).toFixed(2)}
-                </Text>
-              </View>
-            )}
+              );
+            }}
             ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
           />
         )}
@@ -340,58 +350,75 @@ export default function McpDashboard() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 37 : 20, paddingBottom: 12 },
+  header: { paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 40 : 25, paddingBottom: 12 },
   title: { fontSize: 28, fontWeight: 'bold', marginBottom: 4 },
   subtitle: { fontSize: 14 },
   settingsButton: { padding: 8 },
-  balanceCard: {
+  modernCard: {
     marginHorizontal: 16,
-    marginVertical: 16,
+    marginTop: 16,
     padding: 20,
-    borderRadius: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.03)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 3,
   },
-  balanceLabel: { fontSize: 12, marginBottom: 4 },
-  balanceAmount: { fontSize: 36, fontWeight: 'bold' },
-  statusBadge: {
+  mpaCard: {
+    marginTop: 16,
+  },
+  mpaTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  cardHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  balanceLabel: { fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600' },
+  balanceAmount: { fontSize: 36, fontWeight: '800', letterSpacing: -1 },
+  statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    marginTop: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
-  statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
-  statusText: { fontSize: 12, fontWeight: '600' },
-  commissionLabel: { fontSize: 12, marginBottom: 4 },
-  commissionAmount: { fontSize: 24, fontWeight: 'bold' },
+  statusDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
+  statusText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  commissionSection: { flexDirection: 'row', marginTop: 20, paddingTop: 16, borderTopWidth: 1, alignItems: 'center' },
+  commissionIconWrap: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(34, 197, 94, 0.15)', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  commissionLabel: { fontSize: 12, marginBottom: 2 },
+  commissionAmount: { fontSize: 20, fontWeight: '800' },
   scanButton: {
+    flexDirection: 'row',
     height: 56,
-    borderRadius: 8,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  scanButtonText: { fontSize: 16, fontWeight: '600' },
-  confirmationResult: {
-    marginHorizontal: 16,
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  confirmationTitle: { fontSize: 14, fontWeight: 'bold', marginBottom: 8 },
+  scanButtonText: { fontSize: 17, fontWeight: '700' },
+  confirmationTitle: { fontSize: 15, fontWeight: 'bold' },
   confirmationDetail: { fontSize: 13, marginVertical: 2 },
   historyTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 12 },
   noData: { fontSize: 14, textAlign: 'center', marginVertical: 20 },
   txRow: {
     flexDirection: 'row',
-    padding: 12,
-    borderRadius: 8,
+    padding: 16,
+    borderRadius: 16,
     borderWidth: 1,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  txType: { fontSize: 14, fontWeight: '600', marginBottom: 4 },
-  txTime: { fontSize: 12 },
-  txAmount: { fontSize: 16, fontWeight: 'bold' },
+  iconWrap: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  txType: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
+  txTime: { fontSize: 13 },
+  txAmount: { fontSize: 17, fontWeight: '800' },
   scanModal: { flex: 1 },
   scanCloseButton: { alignSelf: 'flex-end', padding: 16 },
   scanCloseText: { fontSize: 24, fontWeight: 'bold' },
@@ -415,4 +442,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   confirmButtonText: { fontSize: 16, fontWeight: '600' },
+  logoSmall: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    marginRight: 12,
+  },
 });

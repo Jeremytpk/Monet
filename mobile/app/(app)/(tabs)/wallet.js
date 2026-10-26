@@ -7,6 +7,7 @@ import {
   ScrollView,
   Image,
   Dimensions,
+  Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +16,7 @@ import { db } from '../../../lib/firebase';
 import { useAuth } from '../../../lib/useAuth';
 import { useTheme } from '../../../lib/ThemeContext';
 import { useLanguage } from '../../../lib/LanguageContext';
+import { cacheImageAsync, warmCacheAsync } from '../../../lib/imageCache';
 
 const BANNER_GAP = 14;
 const BANNER_SLIDE_WIDTH = Dimensions.get('window').width - 48 - BANNER_GAP;
@@ -38,12 +40,16 @@ export default function WalletScreen() {
   const currency = profile?.currency ?? 'USD';
   const bannerRef = useRef(null);
   const [bannerIndex, setBannerIndex] = useState(0);
+  const [adsBanners, setAdsBanners] = useState(null);
+  const [cachedMap, setCachedMap] = useState({});
 
-  const [banners, setBanners] = useState([
+  const defaultBanners = [
     { id: '1', imageUri: BANNER_IMAGES[0], title: t.banner1Title, subtitle: t.banner1Subtitle },
     { id: '2', imageUri: BANNER_IMAGES[1], title: t.banner2Title, subtitle: t.banner2Subtitle },
     { id: '3', imageUri: BANNER_IMAGES[2], title: t.banner3Title, subtitle: t.banner3Subtitle },
-  ]);
+  ];
+
+  const displayBanners = adsBanners && adsBanners.length > 0 ? adsBanners : defaultBanners;
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -54,16 +60,15 @@ export default function WalletScreen() {
   }, [user?.uid]);
 
   useEffect(() => {
-    if (!banners || banners.length === 0) return;
     const timer = setInterval(() => {
       setBannerIndex((i) => {
-        const next = (i + 1) % banners.length;
+        const next = (i + 1) % displayBanners.length;
         bannerRef.current?.scrollTo({ x: next * BANNER_PAGE_WIDTH, animated: true });
         return next;
       });
     }, AUTO_SWIPE_INTERVAL);
     return () => clearInterval(timer);
-  }, []);
+  }, [displayBanners.length]);
 
   // Subscribe to ads from Firestore. To avoid requiring a composite index (where + orderBy),
   // we order by created_at server-side and filter the `active` flag client-side.
@@ -73,17 +78,35 @@ export default function WalletScreen() {
       if (!snap.empty) {
         // map docs then client-side filter active ones
         const items = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((it) => it.active === true);
-        setBanners(items.map((it, idx) => ({
+        setAdsBanners(items.map((it, idx) => ({
           id: it.id || String(idx),
           imageUri: it.image_url || BANNER_IMAGES[idx % BANNER_IMAGES.length],
           title: it.title || '',
           subtitle: it.message || '',
         })));
         setBannerIndex(0);
+      } else {
+        setAdsBanners(null);
       }
     }, (err) => { console.warn('ads banner onSnapshot error', err); });
     return () => unsub();
   }, []);
+
+  // Pre-cache banner images when displayBanners changes
+  useEffect(() => {
+    const uris = displayBanners.map((b) => b.imageUri).filter(Boolean);
+    let mounted = true;
+    (async () => {
+      try {
+        const map = await warmCacheAsync(uris);
+        if (!mounted) return;
+        setCachedMap((prev) => ({ ...prev, ...map }));
+      } catch (e) {
+        console.warn('banner warmCache error', e);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [displayBanners]);
 
   function handleProfilePress() {
     if (user) {
@@ -100,6 +123,49 @@ export default function WalletScreen() {
   }
 
   const styles = createStyles(colors);
+
+  // Small component that crossfades from placeholder to real image when the real image loads
+  function BannerSlide({ placeholderSource, sourceUri }) {
+    const realOpacity = useRef(new Animated.Value(0)).current;
+    const placeholderOpacity = useRef(new Animated.Value(1)).current;
+    const [loaded, setLoaded] = useState(false);
+
+    // Prefetch remote images to kick off network fetch sooner and detect readiness
+    useEffect(() => {
+      let mounted = true;
+      if (!sourceUri) return;
+      const isRemote = String(sourceUri).startsWith('http');
+      if (!isRemote) {
+        // local file: consider it loaded
+        if (mounted) setLoaded(true);
+        return;
+      }
+      Image.prefetch(sourceUri).then(() => { if (mounted) setLoaded(true); }).catch(() => { if (mounted) setLoaded(false); });
+      // Fallback: if image doesn't load within 5s, mark as loaded so placeholder doesn't stay forever
+      const t = setTimeout(() => { if (mounted) setLoaded(true); }, 5000);
+      return () => { mounted = false; clearTimeout(t); };
+    }, [sourceUri]);
+
+    useEffect(() => {
+      if (!loaded) return;
+      Animated.parallel([
+        Animated.timing(realOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
+        Animated.timing(placeholderOpacity, { toValue: 0, duration: 350, useNativeDriver: true }),
+      ]).start();
+    }, [loaded]);
+
+    return (
+      <>
+        <Animated.Image source={placeholderSource} style={[styles.bannerImage, styles.absoluteImage, { opacity: placeholderOpacity }]} />
+        <Animated.Image
+          source={{ uri: sourceUri }}
+          onLoadEnd={() => setLoaded(true)}
+          onError={() => setLoaded(true)}
+          style={[styles.bannerImage, styles.absoluteImage, { opacity: realOpacity }]}
+        />
+      </>
+    );
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -140,19 +206,26 @@ export default function WalletScreen() {
           snapToAlignment="start"
           contentContainerStyle={styles.bannerContent}
         >
-          {banners.map((b) => (
-            <TouchableOpacity key={b.id} style={styles.bannerSlide} activeOpacity={1}>
-              <Image source={{ uri: b.imageUri }} style={styles.bannerImage} />
-              <View style={styles.bannerOverlay} />
-              <View style={styles.bannerTextWrap}>
-                <Text style={styles.bannerTitle}>{b.title}</Text>
-                <Text style={styles.bannerSubtitle}>{b.subtitle}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+          {displayBanners.map((b) => {
+            const cached = cachedMap[b.imageUri];
+            const sourceUri = cached || b.imageUri;
+            return (
+              <TouchableOpacity key={b.id} style={styles.bannerSlide} activeOpacity={1}>
+                <BannerSlide
+                  placeholderSource={require('../../../assets/icon.png')}
+                  sourceUri={sourceUri}
+                />
+                <View style={styles.bannerOverlay} />
+                <View style={styles.bannerTextWrap}>
+                  <Text style={styles.bannerTitle}>{b.title}</Text>
+                  <Text style={styles.bannerSubtitle}>{b.subtitle}</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
         <View style={styles.bannerDots}>
-          {banners.map((_, i) => (
+          {displayBanners.map((_, i) => (
             <View
               key={i}
               style={[styles.bannerDot, i === bannerIndex && styles.bannerDotActive]}
@@ -293,6 +366,13 @@ function createStyles(colors) {
       width: '100%',
       height: '100%',
       resizeMode: 'cover',
+    },
+    absoluteImage: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: '100%',
+      height: '100%',
     },
     bannerOverlay: {
       ...StyleSheet.absoluteFillObject,

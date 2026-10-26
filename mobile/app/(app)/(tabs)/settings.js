@@ -34,15 +34,12 @@ export default function SettingsScreen() {
 
   const styles = createStyles(colors);
 
-  if (!user) {
-    return (
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={[styles.content, styles.guestContent]}
-        showsVerticalScrollIndicator={false}
-      >
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <Text style={[styles.screenTitle, !user && styles.guestScreenTitle]}>{t.settings}</Text>
+
+      {!user ? (
         <View style={styles.guestCenter}>
-          <Text style={[styles.screenTitle, styles.guestScreenTitle]}>{t.settings}</Text>
           <View style={styles.guestCard}>
             <Ionicons name="lock-closed-outline" size={48} color={colors.muted} style={styles.guestIcon} />
             <Text style={styles.guestTitle}>{t.signInToAccessSettings}</Text>
@@ -56,65 +53,58 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           </View>
         </View>
-        <View style={styles.footer}>
-          <Text style={[styles.footerText, { color: colors.muted }]}>{t.footerText}</Text>
-        </View>
-      </ScrollView>
-    );
-  }
-
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.screenTitle}>{t.settings}</Text>
-
-      <TouchableOpacity
-        style={styles.profileCard}
-        activeOpacity={0.8}
-        onPress={() => router.push('/(app)/profile')}
-      >
-        <View style={[styles.avatarWrap, { borderColor: colors.border }]}>
-          {photoUrl ? (
-            <Image source={{ uri: photoUrl }} style={styles.avatar} />
-          ) : (
-            <View style={[styles.avatarPlaceholder, { backgroundColor: colors.border }]}>
-              <Text style={[styles.avatarInitial, { color: colors.textSecondary }]}>{initial}</Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.profileCardRight}>
-          <Text style={styles.profileName}>{profile?.name || '—'}</Text>
+      ) : (
+        <>
           <TouchableOpacity
-            style={styles.editButton}
-            onPress={(e) => { e?.stopPropagation?.(); router.push('/(app)/profile'); }}
+            style={styles.profileCard}
+            activeOpacity={0.8}
+            onPress={() => router.push('/(app)/profile')}
           >
-            <Ionicons name="pencil" size={14} color={colors.accent} />
-            <Text style={[styles.editButtonText, { color: colors.accent }]}>{t.edit}</Text>
-          </TouchableOpacity>
-        </View>
-      </TouchableOpacity>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>{t.paymentMethods}</Text>
-        <View style={styles.card}>
-          <TouchableOpacity
-            style={styles.rowButton}
-            onPress={() => router.push('/(app)/payment-methods')}
-            activeOpacity={0.7}
-          >
-            <View style={styles.rowButtonLeft}>
-              <Ionicons name="card-outline" size={22} color={colors.accent} style={styles.rowIcon} />
-              <Text style={[styles.rowButtonLabel, { color: colors.text }]}>{t.cardBankAccount}</Text>
+            <View style={[styles.avatarWrap, { borderColor: colors.border }]}>
+              {photoUrl ? (
+                <Image source={{ uri: photoUrl }} style={styles.avatar} />
+              ) : (
+                <View style={[styles.avatarPlaceholder, { backgroundColor: colors.border }]}>
+                  <Text style={[styles.avatarInitial, { color: colors.textSecondary }]}>{initial}</Text>
+                </View>
+              )}
             </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+            <View style={styles.profileCardRight}>
+              <Text style={styles.profileName}>{profile?.name || '—'}</Text>
+              <TouchableOpacity
+                style={styles.editButton}
+                onPress={(e) => { e?.stopPropagation?.(); router.push('/(app)/profile'); }}
+              >
+                <Ionicons name="pencil" size={14} color={colors.accent} />
+                <Text style={[styles.editButtonText, { color: colors.accent }]}>{t.edit}</Text>
+              </TouchableOpacity>
+            </View>
           </TouchableOpacity>
-          <View style={[styles.row, styles.rowBorder]}>
-            <Text style={[styles.rowLabel, { color: colors.textSecondary }]}>{t.fundingSources}</Text>
-            <Text style={styles.rowValue} numberOfLines={1}>
-              {[profile?.card_last4 && `Card •••• ${profile.card_last4}`, profile?.bank_account_last4 && `Bank •••• ${profile.bank_account_last4}`].filter(Boolean).join(' · ') || t.noneAdded}
-            </Text>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{t.paymentMethods}</Text>
+            <View style={styles.card}>
+              <TouchableOpacity
+                style={styles.rowButton}
+                onPress={() => router.push('/(app)/payment-methods')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.rowButtonLeft}>
+                  <Ionicons name="card-outline" size={22} color={colors.accent} style={styles.rowIcon} />
+                  <Text style={[styles.rowButtonLabel, { color: colors.text }]}>{t.cardBankAccount}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+              </TouchableOpacity>
+              <View style={[styles.row, styles.rowBorder]}>
+                <Text style={[styles.rowLabel, { color: colors.textSecondary }]}>{t.fundingSources}</Text>
+                <Text style={styles.rowValue} numberOfLines={1}>
+                  {[profile?.card_last4 && `Card •••• ${profile.card_last4}`, profile?.bank_account_last4 && `Bank •••• ${profile.bank_account_last4}`].filter(Boolean).join(' · ') || t.noneAdded}
+                </Text>
+              </View>
+            </View>
           </View>
-        </View>
-      </View>
+        </>
+      )}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t.appearance}</Text>
@@ -132,44 +122,70 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>{t.account}</Text>
-        <View style={styles.card}>
-          {String(profile?.role || '').toLowerCase() === 'admin' ? (
-            <TouchableOpacity
-              style={styles.rowButton}
-              onPress={() => router.push('/(app)/admin')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.rowButtonLeft}>
-                <Ionicons name="shield-checkmark-outline" size={22} color={colors.accent} style={styles.rowIcon} />
-                <Text style={[styles.rowButtonLabel, { color: colors.text }]}>Admin Dashboard</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.muted} />
-            </TouchableOpacity>
-          ) : null}
-          <TouchableOpacity
-            style={styles.rowButton}
-            onPress={async () => {
-              await signOut(auth);
-              router.replace('/(app)/(tabs)/wallet');
-              Alert.alert(t.success, t.successSignedOut, [{ text: t.ok }]);
-            }}
-          >
-            <Text style={[styles.rowButtonLabel, { color: colors.text }]}>{t.signOut}</Text>
-            <Ionicons name="log-out-outline" size={20} color={colors.muted} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t.app}</Text>
         <View style={styles.card}>
+          <TouchableOpacity
+            style={[styles.rowButton, styles.rowBorder]}
+            onPress={() => router.push('/(app)/about')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.rowButtonLeft}>
+              <Text style={[styles.rowButtonLabel, { color: colors.text }]}>{t.about || 'About'}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+          </TouchableOpacity>
           <View style={[styles.row]}>
             <Text style={styles.rowLabel}>{t.version}</Text>
             <Text style={styles.rowValue} numberOfLines={1}>1.0.0</Text>
           </View>
         </View>
       </View>
+
+      {user && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t.account}</Text>
+          <View style={styles.card}>
+            {String(profile?.role || '').toLowerCase() === 'admin' ? (
+            <>
+              <TouchableOpacity
+                style={[styles.rowButton, styles.rowBorder]}
+                onPress={() => router.push('/(app)/admin')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.rowButtonLeft}>
+                  <Ionicons name="shield-checkmark-outline" size={22} color={colors.accent} style={styles.rowIcon} />
+                  <Text style={[styles.rowButtonLabel, { color: colors.text }]}>Admin Dashboard</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.rowButton, styles.rowBorder]}
+                onPress={() => router.push('/(app)/admin/activities')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.rowButtonLeft}>
+                  <Ionicons name="pulse" size={22} color={colors.accent} style={styles.rowIcon} />
+                  <Text style={[styles.rowButtonLabel, { color: colors.text }]}>Global Activity (Admin)</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+              </TouchableOpacity>
+            </>
+            ) : null}
+            <TouchableOpacity
+              style={styles.rowButton}
+              onPress={async () => {
+                await signOut(auth);
+                router.replace('/(app)/(tabs)/wallet');
+                Alert.alert(t.success, t.successSignedOut, [{ text: t.ok }]);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.rowButtonLabel, { color: '#EF4444' }]}>{t.signOut}</Text>
+              <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       <View style={styles.footer}>
         <Text style={[styles.footerText, { color: colors.muted }]}>{t.footerText}</Text>
